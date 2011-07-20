@@ -108,8 +108,8 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
               '#value' => $node->{$field}[$node->language],
             );
             $form['comment_alter']['new'][$field] = $full_form[$field];
-            $field_info = field_info_instance('node', $field, $node->type);
-            $form['comment_alter']['new'][$field]['#weight'] = $field_info['widget']['weight'];
+            $field_info_instance = field_info_instance('node', $field, $node->type);
+            $form['comment_alter']['new'][$field]['#weight'] = $field_info_instance['widget']['weight'];
           }
         }
         $form['comment_alter']['#tree'] = TRUE;
@@ -126,14 +126,26 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
               check_plain($type->title_label),
               check_plain($comment->comment_alter['fields'][$field]['old']),
               check_plain($comment->comment_alter['fields'][$field]['new']),
+              'weight' => -99,
             );
             // XXX: What to do if eg. auto_nodetitle.module hides the node title
             // widget? :S
           }
           else {
-            // TODO: Handle fields.
+            $field_info_field = field_info_field($field);
+            $field_info_instance = field_info_instance('node', $field, $node->type);
+            $old_element = field_default_view('node', $node, $field_info_field, $field_info_instance, $node->language, $comment->comment_alter['fields'][$field]['old'], 'full');
+            $new_element = field_default_view('node', $node, $field_info_field, $field_info_instance, $node->language, $comment->comment_alter['fields'][$field]['new'], 'full');
+            $rows[] = array(
+              // XXX: i18n?
+              check_plain($field_info_instance['label']),
+              drupal_render($old_element),
+              drupal_render($new_element),
+              'weight' => $field_info_instance['display']['default']['weight'],
+            );
           }
         }
+        _comment_alter_sort_fields($rows);
         $form['comment_alter'] = array(
           '#theme' => 'table',
           '#header' => array(
@@ -234,12 +246,34 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
           check_plain($type->title_label),
           check_plain($value['old']),
           check_plain($value['new']),
+          'weight' => -99,
         );
       }
       else {
-        // TODO: Handle fields.
+        $field_info_field = field_info_field($field);
+        $field_info_instance = field_info_instance('node', $field, $node->type);
+        $old_element = field_default_view('node', $node, $field_info_field, $field_info_instance, $node->language, $value['old'], 'full');
+        $new_element = field_default_view('node', $node, $field_info_field, $field_info_instance, $node->language, $value['new'], 'full');
+        $comment->content['comment_alter']['#rows'][] = array(
+          // XXX: i18n?
+          check_plain($field_info_instance['label']),
+          drupal_render($old_element),
+          drupal_render($new_element),
+          'weight' => $field_info_instance['display']['default']['weight'],
+        );
       }
     }
+    _comment_alter_sort_fields($comment->content['comment_alter']['#rows']);
+  }
+}
+
+/**
+ * Sort altered fields by their weights.
+ */
+function _comment_alter_sort_fields(&$rows) {
+  uasort($rows, 'drupal_sort_weight');
+  foreach ($rows as &$value) {
+    unset($value['weight']);
   }
 }
 
