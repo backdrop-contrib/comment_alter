@@ -238,7 +238,11 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
       '#header' => array(t('Field'), t('Old value'), t('New value')),
       '#rows' => array(),
     );
-    // XXX: Add a deeplink to the affected revision?
+    $comment->content['links']['comment']['#links']['comment-alter'] = array(
+      'title' => t('view full node revision'),
+      'href' => 'node/' . $node->nid . '/revisions/' . $comment->comment_alter['vid'] . '/view',
+      'html' => TRUE,
+    );
     foreach ($comment->comment_alter['fields'] as $field => $value) {
       if ($field == 'title') {
         $comment->content['comment_alter']['#rows'][] = array(
