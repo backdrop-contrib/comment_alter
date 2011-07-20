@@ -1,0 +1,225 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Provides UI to alter nodes' parameters from comment forms.
+ *
+ * @author
+ * CSÉCSY László <boobaa@kybest.hu>
+ */
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function comment_alter_form_field_ui_field_overview_form_alter(&$form, &$form_state) {
+  $node_type = $form['#bundle'];
+  $comment_alter_fields = variable_get('comment_alter_fields', array());
+  $comment_alter = FALSE;
+  foreach (element_children($form['fields']) as $field) {
+    // Node title and all fields are candidates for synchronization.
+    if ((isset($form['fields'][$field]['field_name']['#markup']) && ($form['fields'][$field]['field_name']['#markup'] == 'title')) ||
+      ($form['fields'][$field]['#row_type'] == 'field') ||
+      ($form['fields'][$field]['#row_type'] == 'add_new_field')
+    ) {
+      $form['fields'][$field]['comment_alter'] = array(
+        '#type' => 'checkbox',
+        '#default_value' => (isset($comment_alter_fields[$node_type]) && isset($comment_alter_fields[$node_type][$field])) ? 1 : 0,
+      );
+      $comment_alter = TRUE;
+    }
+  }
+  if ($comment_alter) {
+    $form['#submit'][] = 'comment_alter_form_field_ui_field_overview_form_alter_submit';
+  }
+}
+
+/**
+ * Stores if any fields are to be synchronized.
+ */
+function comment_alter_form_field_ui_field_overview_form_alter_submit($form, &$form_state) {
+  $node_type = $form['#bundle'];
+  // The comment_alter_fields Drupal variable stores if any given 'field' of
+  // any content type is to be synchronized by comment_alter in a
+  // multi-dimensional array. First dimension is the bundle (content type),
+  // second dimension is the 'field'. (Using 'field' since node title is
+  // eligible for synchronization as well, but that is not a field.)
+  $comment_alter_fields = variable_get('comment_alter_fields', array());
+  $comment_alter_fields[$node_type] = array();
+  foreach ($form_state['values']['fields'] as $field => $values) {
+    if ($values['comment_alter']) {
+      // New field should be added to synchronization only if it has a field
+      // name (if it does not have one then it means no new field is added
+      if (($field == '_add_new_field') && $values['field_name']) {
+        $comment_alter_fields[$node_type][$field] = $field;
+      }
+      else {
+        $comment_alter_fields[$node_type][$field] = $field;
+      }
+    }
+  }
+  variable_set('comment_alter_fields', $comment_alter_fields);
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function comment_alter_form_alter(&$form, &$form_state, $form_id) {
+  if ($form['#id'] == 'comment-form') {
+    $edit_comment = !empty($form['cid']['#value']);
+    $node = $form['#node'];
+    $comment_alter_fields = variable_get('comment_alter_fields', array());
+    if (isset($comment_alter_fields[$node->type])) {
+      // Add widgets on new comment form, add a simple table on edit comment
+      // form.
+      if (empty($form['cid']['#value'])) {
+        foreach ($comment_alter_fields[$node->type] as $field) {
+          // The 'field' called 'title' needs special threatment since it is not
+          // really a field, but a "simple" textfield.
+          if ($field == 'title') {
+            // XXX: What to do if eg. auto_nodetitle.module hides the node title
+            // widget? :S
+            $form['comment_alter']['old']['title'] = array(
+              '#type' => 'value',
+              '#value' => $node->title,
+            );
+            $form['comment_alter']['new']['title'] = array(
+              '#type' => 'textfield',
+              // TODO: Retrieve node type specific title label instead.
+              '#title' => t('Title'),
+              '#default_value' => $node->title,
+            );
+          }
+          else {
+            // TODO: Handle fields.
+          }
+        }
+        $form['comment_alter']['#tree'] = TRUE;
+      }
+      else {
+        $rows = array();
+        $comment = comment_load($form['cid']['#value']);
+        foreach ($comment_alter_fields[$node->type] as $field) {
+          // The 'field' called 'title' needs special threatment since it is not
+          // really a field, but a "simple" textfield.
+          if ($field == 'title') {
+            $rows[] = array(
+              // TODO: Retrieve node type specific title label instead.
+              t('Title'),
+              check_plain($comment->comment_alter['fields'][$field]['old']),
+              check_plain($comment->comment_alter['fields'][$field]['new']),
+            );
+            // XXX: What to do if eg. auto_nodetitle.module hides the node title
+            // widget? :S
+          }
+          else {
+            // TODO: Handle fields.
+          }
+        }
+        $form['comment_alter'] = array(
+          '#theme' => 'table',
+          '#header' => array(
+            t('Field'),
+            t('Old value'),
+            t('New value'),
+          ),
+          '#rows' => $rows,
+        );
+      }
+      $form['comment_alter']['#weight'] = -1;
+    }
+  }
+}
+
+/**
+ * Implements hook_comment_insert().
+ */
+function comment_alter_comment_insert($comment) {
+  $comment_alter = array();
+  $node = node_load($comment->nid);
+  foreach ($comment->comment_alter['new'] as $field => $value) {
+    if ($comment->comment_alter['old'][$field] != $value) {
+      $comment_alter[$field] = array(
+        'old' => $comment->comment_alter['old'][$field],
+        'new' => $value,
+      );
+      // Node title needs special threatment.
+      if ($field == 'title') {
+        $node->title = $value;
+      }
+      else {
+        // TODO: Handle fields.
+      }
+    }
+  }
+  if (!empty($comment_alter)) {
+    // Creating a new node revision regardless the node type settings.
+    $node->revision = TRUE;
+    node_save($node);
+    $store = array(
+      'cid' => $comment->cid,
+      'vid' => $node->vid,
+      'data' => serialize($comment_alter),
+    );
+    drupal_write_record('comment_alter', $store);
+  }
+  // Unsetting $comment->comment_alter is not needed.
+}
+
+/**
+ * Implements hook_comment_load().
+ */
+function comment_alter_comment_load($comments) {
+  $result = db_query('SELECT cid, vid, data FROM {comment_alter} WHERE cid IN (:cids)', array(':cids' => array_keys($comments)));
+  foreach ($result as $row) {
+    $comments[$row->cid]->comment_alter['vid'] = $row->vid;
+    $data = unserialize($row->data);
+    foreach ($data as $field => $value) {
+      $comments[$row->cid]->comment_alter['fields'][$field]['old'] = $value['old'];
+      $comments[$row->cid]->comment_alter['fields'][$field]['new'] = $value['new'];
+    }
+  }
+}
+
+/**
+ * Implements hook_comment_view().
+ */
+function comment_alter_comment_view($comment, $view_mode, $langcode) {
+  if (($view_mode == 'full') && isset($comment->comment_alter) && isset($comment->comment_alter['fields']) && !empty($comment->comment_alter['fields'])) {
+    $comment->content['comment_alter'] = array(
+      '#theme' => 'table',
+      '#weight' => -1,
+      '#header' => array(t('Field'), t('Old value'), t('New value')),
+      '#rows' => array(),
+    );
+    // XXX: Add a deeplink to the affected revision?
+    foreach ($comment->comment_alter['fields'] as $field => $value) {
+      if ($field == 'title') {
+        $comment->content['comment_alter']['#rows'][] = array(
+          // TODO: Retrieve node type specific title label instead.
+          t('Title'),
+          check_plain($value['old']),
+          check_plain($value['new']),
+        );
+      }
+      else {
+        // TODO: Handle fields.
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_comment_delete().
+ */
+function comment_alter_comment_delete($comment) {
+  db_delete('comment_alter')
+    ->condition('cid', $comment->cid)
+    ->execute();
+}
+
+/**
+ * No need to implement hook_comment_update(), hook_comment_presave(),
+ * hook_comment_publish(), hook_comment_unpublish() nor
+ * hook_comment_view_alter().
+ */

@@ -1,0 +1,46 @@
+<?php
+
+/**
+ * @file
+ * Un/install functions for Comment alter.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function comment_alter_schema() {
+  $schema['comment_alter'] = array(
+    'description' => 'Stores simple site-wide guestbook entries.',
+    'fields' => array(
+      'cid' => array(
+        'description' => 'The {comment}.cid this change refers to.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'vid' => array(
+        'description' => 'The {node}.vid this change refers to.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'data' => array(
+        'description' => 'The changed data, serialized.',
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
+    ),
+    'indexes' => array(
+      'vid' => array('vid'),
+    ),
+    'primary key' => array('cid'),
+  );
+  return $schema;
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function comment_alter_uninstall() {
+  variable_del('comment_alter_fields');
+}
