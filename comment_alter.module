@@ -68,6 +68,7 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#id'] == 'comment-form') {
     $edit_comment = !empty($form['cid']['#value']);
     $node = $form['#node'];
+    $type = node_type_get_type($node);
     $comment_alter_fields = variable_get('comment_alter_fields', array());
     if (isset($comment_alter_fields[$node->type])) {
       // Add widgets on new comment form, add a simple table on edit comment
@@ -85,8 +86,8 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
             );
             $form['comment_alter']['new']['title'] = array(
               '#type' => 'textfield',
-              // TODO: Retrieve node type specific title label instead.
-              '#title' => t('Title'),
+              // XXX: i18n?
+              '#title' => check_plain($type->title_label),
               '#default_value' => $node->title,
             );
           }
@@ -104,8 +105,8 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
           // really a field, but a "simple" textfield.
           if ($field == 'title') {
             $rows[] = array(
-              // TODO: Retrieve node type specific title label instead.
-              t('Title'),
+              // XXX: i18n?
+              check_plain($type->title_label),
               check_plain($comment->comment_alter['fields'][$field]['old']),
               check_plain($comment->comment_alter['fields'][$field]['new']),
             );
@@ -186,6 +187,8 @@ function comment_alter_comment_load($comments) {
  */
 function comment_alter_comment_view($comment, $view_mode, $langcode) {
   if (($view_mode == 'full') && isset($comment->comment_alter) && isset($comment->comment_alter['fields']) && !empty($comment->comment_alter['fields'])) {
+    $node = node_load($comment->nid);
+    $type = node_type_get_type($node);
     $comment->content['comment_alter'] = array(
       '#theme' => 'table',
       '#weight' => -1,
@@ -196,8 +199,8 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
     foreach ($comment->comment_alter['fields'] as $field => $value) {
       if ($field == 'title') {
         $comment->content['comment_alter']['#rows'][] = array(
-          // TODO: Retrieve node type specific title label instead.
-          t('Title'),
+          // XXX: i18n?
+          check_plain($type->title_label),
           check_plain($value['old']),
           check_plain($value['new']),
         );
