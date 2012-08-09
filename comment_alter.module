@@ -11,61 +11,46 @@
 
 /**
  * Implements hook_form_FORM_ID_alter().
+ *
+ * @see comment_alter_form_field_ui_field_edit_form_alter_submit()
  */
-function comment_alter_form_field_ui_field_overview_form_alter(&$form, &$form_state) {
-  $node_type = $form['#bundle'];
-  $comment_alter_fields = variable_get('comment_alter_fields', array());
-  $comment_alter = FALSE;
-  foreach (element_children($form['fields']) as $field) {
-    // Node title and all fields are candidates for synchronization.
-    if ((isset($form['fields'][$field]['field_name']['#markup']) && ($form['fields'][$field]['field_name']['#markup'] == 'title')) ||
-      ($form['fields'][$field]['#row_type'] == 'field') ||
-      ($form['fields'][$field]['#row_type'] == 'add_new_field')
-    ) {
-      $form['fields'][$field]['comment_alter'] = array(
-        '#type' => 'checkbox',
-        '#default_value' => (isset($comment_alter_fields[$node_type]) && isset($comment_alter_fields[$node_type][$field])) ? 1 : 0,
-      );
-      $comment_alter = TRUE;
-    }
-  }
-  if ($comment_alter) {
-    $form['#submit'][] = 'comment_alter_form_field_ui_field_overview_form_alter_submit';
+function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state) {
+  if ($form['instance']['entity_type']['#value'] == 'node') {
+    $form['#comment_alter'] = array(
+      '#type' => 'value',
+      '#value' => variable_get('comment_alter_' . $form['instance']['bundle']['#value'], array()),
+    );
+    $form['instance']['comment_alter'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable altering this field from comments.'),
+      '#weight' => $form['instance']['required']['#weight'] + 0.5,
+      '#default_value' => isset($form['#comment_alter']['#value'][$form['instance']['field_name']['#value']]) ? $form['#comment_alter']['#value'][$form['instance']['field_name']['#value']] : FALSE,
+    );
+    $form['#submit'][] = 'comment_alter_form_field_ui_field_edit_form_alter_submit';
   }
 }
 
 /**
- * Stores if any fields are to be synchronized.
+ * Stores status of comment-alterable checkbox.
+ *
+ * @see comment_alter_form_field_ui_field_edit_form_alter()
  */
-function comment_alter_form_field_ui_field_overview_form_alter_submit($form, &$form_state) {
-  $node_type = $form['#bundle'];
-  // The comment_alter_fields Drupal variable stores if any given 'field' of
-  // any content type is to be synchronized by comment_alter in a
-  // multi-dimensional array. First dimension is the bundle (content type),
-  // second dimension is the 'field'. (Using 'field' since node title is
-  // eligible for synchronization as well, but that is not a field.)
-  $comment_alter_fields = variable_get('comment_alter_fields', array());
-  $comment_alter_fields[$node_type] = array();
-  foreach ($form_state['values']['fields'] as $field => $values) {
-    if ($values['comment_alter']) {
-      // New field should be added to synchronization only if it has a field
-      // name (if it does not have one then it means no new field is added
-      if (($field == '_add_new_field') && $values['field_name']) {
-        $comment_alter_fields[$node_type][$field] = $field;
-      }
-      else {
-        $comment_alter_fields[$node_type][$field] = $field;
-      }
-    }
-  }
-  variable_set('comment_alter_fields', $comment_alter_fields);
+function comment_alter_form_field_ui_field_edit_form_alter_submit($form, &$form_state) {
+  // Store only those field names that have been set to be comment-alterable
+  // for performance reasons.
+  $comment_alter = $form['#comment_alter']['#value'];
+  $comment_alter[$form['instance']['field_name']['#value']] = $form_state['values']['instance']['comment_alter'];
+  $comment_alter = array_filter($comment_alter);
+  variable_set('comment_alter_' . $form['instance']['bundle']['#value'], $comment_alter);
 }
+
 
 /**
  * Implements hook_form_alter().
  */
 function comment_alter_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#id'] == 'comment-form') {
+    dpm($form);
     $edit_comment = !empty($form['cid']['#value']);
     $node = $form['#node'];
     $type = node_type_get_type($node);
