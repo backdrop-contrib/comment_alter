@@ -50,98 +50,36 @@ function comment_alter_form_field_ui_field_edit_form_alter_submit($form, &$form_
  */
 function comment_alter_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#id'] == 'comment-form') {
-    dpm($form);
     $edit_comment = !empty($form['cid']['#value']);
     $node = $form['#node'];
     $type = node_type_get_type($node);
-    $comment_alter_fields = variable_get('comment_alter_fields', array());
-    if (isset($comment_alter_fields[$node->type])) {
-      // Add widgets on new comment form, add a simple table on edit comment
-      // form.
-      if (empty($form['cid']['#value'])) {
-        // OK, let's twist things a little bit. Save our precious $form, call
-        // field_attach_form() which modifies it (by adding the fields),
-        // save the full form with all the fields, restore our precious saved
-        // form without the fields, and add only the needed fields to it.
-        // Simple, isn't it? Weird, but works; patches welcome for a less
-        // resource-hungry version (or simply 'better', by any means).
-        $precious_form = $form;
-        field_attach_form('node', $node, $form, $form_state, $node->language);
-        $full_form = $form;
-        $form = $precious_form;
-        foreach ($comment_alter_fields[$node->type] as $field) {
-          // The 'field' called 'title' needs special threatment since it is not
-          // really a field, but a "simple" textfield.
-          if ($field == 'title') {
-            // XXX: What to do if eg. auto_nodetitle.module hides the node title
-            // widget? :S
-            $form['comment_alter']['old']['title'] = array(
-              '#type' => 'value',
-              '#value' => $node->title,
-            );
-            $form['comment_alter']['new']['title'] = array(
-              '#type' => 'textfield',
-              // XXX: i18n?
-              '#title' => check_plain($type->title_label),
-              '#default_value' => $node->title,
-              '#weight' => -99,
-            );
-          }
-          else {
-            $form['comment_alter']['old'][$field] = array(
-              '#type' => 'value',
-              '#value' => $node->{$field}[$node->language],
-            );
-            $form['comment_alter']['new'][$field] = $full_form[$field];
-            $field_info_instance = field_info_instance('node', $field, $node->type);
-            $form['comment_alter']['new'][$field]['#weight'] = $field_info_instance['widget']['weight'];
-          }
-        }
-        $form['comment_alter']['#tree'] = TRUE;
-      }
-      else {
-        $rows = array();
-        $comment = comment_load($form['cid']['#value']);
-        foreach ($comment_alter_fields[$node->type] as $field) {
-          // The 'field' called 'title' needs special threatment since it is not
-          // really a field, but a "simple" textfield.
-          if ($field == 'title') {
-            $rows[] = array(
-              // XXX: i18n?
-              check_plain($type->title_label),
-              check_plain($comment->comment_alter['fields'][$field]['old']),
-              check_plain($comment->comment_alter['fields'][$field]['new']),
-              'weight' => -99,
-            );
-            // XXX: What to do if eg. auto_nodetitle.module hides the node title
-            // widget? :S
-          }
-          else {
-            $field_info_field = field_info_field($field);
-            $field_info_instance = field_info_instance('node', $field, $node->type);
-            $old_element = field_default_view('node', $node, $field_info_field, $field_info_instance, $node->language, $comment->comment_alter['fields'][$field]['old'], 'full');
-            $new_element = field_default_view('node', $node, $field_info_field, $field_info_instance, $node->language, $comment->comment_alter['fields'][$field]['new'], 'full');
-            $rows[] = array(
-              // XXX: i18n?
-              check_plain($field_info_instance['label']),
-              drupal_render($old_element),
-              drupal_render($new_element),
-              'weight' => $field_info_instance['display']['default']['weight'],
-            );
-          }
-        }
-        _comment_alter_sort_fields($rows);
-        $form['comment_alter'] = array(
-          '#theme' => 'table',
-          '#header' => array(
-            t('Field'),
-            t('Old value'),
-            t('New value'),
-          ),
-          '#rows' => $rows,
+    $comment_alter_fields = array_keys(variable_get('comment_alter_' . $node->type, array()));
+    // Add widgets on new comment form only.
+    if (empty($form['cid']['#value'])) {
+      // OK, let's twist things a little bit. Save our precious $form, call
+      // field_attach_form() which modifies it (by adding the fields),
+      // save the full form with all the fields, restore our precious saved
+      // form without the fields, and add only the needed fields to it.
+      // Simple, isn't it? Weird, but works; patches welcome for a less
+      // resource-hungry version (or simply 'better', by any means).
+      $precious_form = $form;
+      field_attach_form('node', $node, $form, $form_state, $node->language);
+      $full_form = $form;
+      $form = $precious_form;
+      foreach ($comment_alter_fields as $field) {
+        $form['comment_alter']['old'][$field] = array(
+          '#type' => 'value',
+          '#value' => $node->{$field}[$node->language],
         );
+        $form['comment_alter']['new'][$field] = $full_form[$field];
+        $field_info_instance = field_info_instance('node', $field, $node->type);
+        $form['comment_alter']['new'][$field]['#weight'] = $field_info_instance['widget']['weight'];
       }
-      $form['comment_alter']['#weight'] = -1;
+      $form['comment_alter']['#tree'] = TRUE;
+      $form['comment_alter']['old_vid'] = array(
+        '#type' => 'value',
+        '#value' => $node->vid,
+      );
     }
   }
 }
@@ -154,30 +92,20 @@ function comment_alter_comment_insert($comment) {
   $node = node_load($comment->nid);
   foreach ($comment->comment_alter['new'] as $field => $value) {
     if ($comment->comment_alter['old'][$field] != $value) {
-      // Node title needs special threatment.
-      if ($field == 'title') {
-        $comment_alter[$field] = array(
-          'old' => $comment->comment_alter['old'][$field],
-          'new' => $value,
-        );
-        $node->title = $value;
-      }
-      else {
-        $field_changed = FALSE;
-        foreach ($value[$node->language] as $delta => $deltavalue) {
-          foreach ($deltavalue as $subfield => $subvalue) {
-            if ($comment->comment_alter['old'][$field][$delta][$subfield] != $subvalue) {
-              $field_changed = TRUE;
-              $node->{$field}[$node->language][$delta][$subfield] = $subvalue;
-            }
+      $field_changed = FALSE;
+      foreach ($value[$node->language] as $delta => $deltavalue) {
+        foreach ($deltavalue as $subfield => $subvalue) {
+          if ($comment->comment_alter['old'][$field][$delta][$subfield] != $subvalue) {
+            $field_changed = TRUE;
+            $node->{$field}[$node->language][$delta][$subfield] = $subvalue;
           }
         }
-        if ($field_changed) {
-          $comment_alter[$field] = array(
-            'old' => $comment->comment_alter['old'][$field],
-            'new' => $comment->comment_alter['new'][$field][$node->language],
-          );
-        }
+      }
+      if ($field_changed) {
+        $comment_alter[$field] = array(
+          'old' => $comment->comment_alter['old'][$field],
+          'new' => $comment->comment_alter['new'][$field][$node->language],
+        );
       }
     }
   }
