@@ -18,20 +18,22 @@ function comment_alter_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
-      'vid' => array(
-        'description' => 'The {node}.vid this change refers to.',
+      'old_vid' => array(
+        'description' => 'The old {node}.vid this change refers to.',
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
       ),
-      'data' => array(
-        'description' => 'The changed data, serialized.',
-        'type' => 'text',
+      'new_vid' => array(
+        'description' => 'The old {node}.vid this change refers to.',
+        'type' => 'int',
         'not null' => TRUE,
+        'default' => 0,
       ),
     ),
     'indexes' => array(
-      'vid' => array('vid'),
+      'new_vid' => array('new_vid'),
+      'old_vid' => array('old_vid'),
     ),
     'primary key' => array('cid'),
   );

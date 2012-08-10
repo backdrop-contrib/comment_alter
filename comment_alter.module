@@ -92,109 +92,103 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
  * Implements hook_comment_insert().
  */
 function comment_alter_comment_insert($comment) {
-  $comment_alter = array();
-  $node = node_load($comment->nid);
-  foreach ($comment->comment_alter['new'] as $field => $value) {
-    if ($comment->comment_alter['old'][$field] != $value) {
-      $field_changed = FALSE;
-      foreach ($value[$node->language] as $delta => $deltavalue) {
-        foreach ($deltavalue as $subfield => $subvalue) {
-          if ($comment->comment_alter['old'][$field][$delta][$subfield] != $subvalue) {
-            $field_changed = TRUE;
-            $node->{$field}[$node->language][$delta][$subfield] = $subvalue;
+  // Do not try to save anything if there is nothing that was allowed to be
+  // changed from the comment form.
+  if (isset($comment->comment_alter['new'])) {
+    $node = node_load($comment->nid);
+    $node_changed = FALSE;
+    foreach ($comment->comment_alter['new'] as $field => $value) {
+      if ($comment->comment_alter['old'][$field] != $value) {
+        foreach ($value[$node->language] as $delta => $deltavalue) {
+          foreach ($deltavalue as $subfield => $subvalue) {
+            if ($comment->comment_alter['old'][$field][$delta][$subfield] != $subvalue) {
+              $node_changed = TRUE;
+              $node->{$field}[$node->language][$delta][$subfield] = $subvalue;
+            }
           }
         }
       }
-      if ($field_changed) {
-        $comment_alter[$field] = array(
-          'old' => $comment->comment_alter['old'][$field],
-          'new' => $comment->comment_alter['new'][$field][$node->language],
-        );
-      }
     }
+    if ($node_changed) {
+      // Creating a new node revision regardless the node type settings.
+      $node->revision = TRUE;
+      node_save($node);
+      $comment_alter = array(
+        'old_vid' => $comment->comment_alter['old_vid'],
+        'new_vid' => $node->vid,
+        'cid' => $comment->cid,
+      );
+      drupal_write_record('comment_alter', $comment_alter);
+    }
+    // Unsetting $comment->comment_alter is not needed.
   }
-  if (!empty($comment_alter)) {
-    // Creating a new node revision regardless the node type settings.
-    $node->revision = TRUE;
-    node_save($node);
-    $store = array(
-      'cid' => $comment->cid,
-      'vid' => $node->vid,
-      'data' => serialize($comment_alter),
-    );
-    drupal_write_record('comment_alter', $store);
-  }
-  // Unsetting $comment->comment_alter is not needed.
 }
 
 /**
  * Implements hook_comment_load().
  */
 function comment_alter_comment_load($comments) {
-  $result = db_query('SELECT cid, vid, data FROM {comment_alter} WHERE cid IN (:cids)', array(':cids' => array_keys($comments)));
+  $result = db_query('SELECT cid, old_vid, new_vid FROM {comment_alter} WHERE cid IN (:cids)', array(':cids' => array_keys($comments)));
   foreach ($result as $row) {
-    $comments[$row->cid]->comment_alter['vid'] = $row->vid;
-    $data = unserialize($row->data);
-    foreach ($data as $field => $value) {
-      $comments[$row->cid]->comment_alter['fields'][$field]['old'] = $value['old'];
-      $comments[$row->cid]->comment_alter['fields'][$field]['new'] = $value['new'];
-    }
+    $comments[$row->cid]->comment_alter['old_vid'] = $row->old_vid;
+    $comments[$row->cid]->comment_alter['new_vid'] = $row->new_vid;
   }
 }
 
 /**
  * Implements hook_comment_view().
+ *
+ * @see diff_diffs_show()
  */
 function comment_alter_comment_view($comment, $view_mode, $langcode) {
-  if (($view_mode == 'full') && isset($comment->comment_alter) && isset($comment->comment_alter['fields']) && !empty($comment->comment_alter['fields'])) {
+  if (($view_mode == 'full') && isset($comment->comment_alter) && isset($comment->comment_alter['old_vid']) && !empty($comment->comment_alter['old_vid'])) {
     $node = node_load($comment->nid);
-    $type = node_type_get_type($node);
-    $comment->content['comment_alter'] = array(
-      '#theme' => 'table',
-      '#weight' => -1,
-      '#header' => array(t('Field'), t('Old value'), t('New value')),
-      '#rows' => array(),
-    );
-    $comment->content['links']['comment']['#links']['comment-alter'] = array(
-      'title' => t('view full node revision'),
-      'href' => 'node/' . $node->nid . '/revisions/' . $comment->comment_alter['vid'] . '/view',
-      'html' => TRUE,
-    );
-    foreach ($comment->comment_alter['fields'] as $field => $value) {
-      if ($field == 'title') {
-        $comment->content['comment_alter']['#rows'][] = array(
-          // XXX: i18n?
-          check_plain($type->title_label),
-          check_plain($value['old']),
-          check_plain($value['new']),
-          'weight' => -99,
-        );
-      }
-      else {
-        $field_info_field = field_info_field($field);
-        $field_info_instance = field_info_instance('node', $field, $node->type);
-        $old_element = field_default_view('node', $node, $field_info_field, $field_info_instance, $node->language, $value['old'], 'full');
-        $new_element = field_default_view('node', $node, $field_info_field, $field_info_instance, $node->language, $value['new'], 'full');
-        $comment->content['comment_alter']['#rows'][] = array(
-          // XXX: i18n?
-          check_plain($field_info_instance['label']),
-          drupal_render($old_element),
-          drupal_render($new_element),
-          'weight' => $field_info_instance['display']['default']['weight'],
-        );
-      }
-    }
-    _comment_alter_sort_fields($comment->content['comment_alter']['#rows']);
-  }
-}
+    $old_vid = &$comment->comment_alter['old_vid'];
+    $new_vid = &$comment->comment_alter['new_vid'];
+    module_load_include('inc', 'diff', 'diff.pages');
 
-/**
- * Sort altered fields by their weights.
- */
-function _comment_alter_sort_fields(&$rows) {
-  uasort($rows, 'drupal_sort_weight');
-  foreach ($rows as &$value) {
-    unset($value['weight']);
+    // A stripped-down version of diff_diffs_show().
+    // Attaches the CSS.
+    $build['#attached'] = diff_build_attachments();
+    $state = variable_get('diff_default_state_node', 'raw');
+    $node_revisions = node_revision_list($node);
+    $old_node = node_load($node->nid, $old_vid);
+    $new_node = node_load($node->nid, $new_vid);
+    // Generate table header (date, username, log message).
+    $old_header = t('!date by !username', array(
+      '!date' => l(format_date($old_node->revision_timestamp), "node/$node->nid/revisions/$old_node->vid/view", array('absolute' => 1)),
+      '!username' => theme('username', array('account' => $node_revisions[$old_vid])),
+    ));
+    $new_header = t('!date by !username', array(
+      '!date' => l(format_date($new_node->revision_timestamp), "node/$node->nid/revisions/$new_node->vid/view", array('absolute' => 1)),
+      '!username' => theme('username', array('account' => $node_revisions[$new_vid])),
+    ));
+    $old_log = $old_node->log != '' ? '<p class="revision-log">' . filter_xss($old_node->log) . '</p>' : '';
+    $new_log = $new_node->log != '' ? '<p class="revision-log">' . filter_xss($new_node->log) . '</p>' : '';
+    $header = _diff_default_header($old_header, $new_header);
+    $rows = array();
+    if ($old_log || $new_log) {
+      $rows['logs'] = array(
+        array(
+          'data' => $old_log,
+          'colspan' => 2,
+        ),
+        array(
+          'data' => $new_log,
+          'colspan' => 2,
+        ),
+      );
+    }
+    $rows = array_merge($rows, _diff_body_rows($old_node, $new_node, $state));
+    $build['diff_table'] = array(
+      '#theme' => 'table__diff__standard',
+      '#header' => $header,
+      '#rows' => $rows,
+      '#attributes' => array('class' => array('diff')),
+      '#colgroups' => _diff_default_cols(),
+      '#sticky' => FALSE,
+    );
+    $comment->content['comment_alter'] = $build;
   }
 }
 

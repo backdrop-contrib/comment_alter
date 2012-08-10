@@ -2,4 +2,4 @@ name = Comment alter
 description = "Provides UI to alter nodes' parameters from comment forms."
 core = 7.x
 dependencies[] = comment
-dependencies[] = diff
+dependencies[] = diff (3.x)
