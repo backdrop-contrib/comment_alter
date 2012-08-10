@@ -72,7 +72,7 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
       foreach ($comment_alter_fields as $field) {
         $form['comment_alter']['old'][$field] = array(
           '#type' => 'value',
-          '#value' => $node->{$field}[$node->language],
+          '#value' => (isset($node->{$field}) && isset($node->{$field}[$node->language])) ? $node->{$field}[$node->language] : NULL,
         );
         $form['comment_alter']['new'][$field] = $full_form[$field];
         // TODO: This doesn't seem to be working properly: if the extra field
