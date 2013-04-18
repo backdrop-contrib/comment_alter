@@ -60,8 +60,9 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
     $node = $form['#node'];
     $type = node_type_get_type($node);
     $comment_alter_fields = array_keys(variable_get('comment_alter_' . $node->type, array()));
-    // Add widgets on new comment form only.
-    if (empty($form['cid']['#value'])) {
+    // Add widgets to comment form if comment form is new,
+    // and if comment alter fields are available.
+    if (empty($form['cid']['#value']) && !empty($comment_alter_fields)) {
       // OK, let's twist things a little bit. Save our precious $form, call
       // field_attach_form() which modifies it (by adding the fields),
       // save the full form with all the fields, restore our precious saved
@@ -72,22 +73,29 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
       field_attach_form('node', $node, $form, $form_state, $node->language);
       $full_form = $form;
       $form = $precious_form;
-      $field_info = field_info_extra_fields('comment', 'comment_node_issue', 'form');
+      $field_info = field_info_extra_fields('comment', 'comment_node_' . $node->type, 'form');
+
       foreach ($comment_alter_fields as $field) {
-        $form['comment_alter']['old'][$field] = array(
-          '#type' => 'value',
-          '#value' => (isset($node->{$field}) && isset($node->{$field}[$node->language])) ? $node->{$field}[$node->language] : NULL,
-        );
-        $form['comment_alter']['new'][$field] = $full_form[$field];
-        // TODO: This doesn't seem to be working properly: if the extra field
-        // is set to last, it even gets displayed above comment subject.
-        $form['comment_alter']['new'][$field]['#weight'] = $field_info[$field]['weight'];
+        if (!empty($full_form[$field]) && $full_form[$field]['#access']) {
+          $field_language = $full_form[$field]['#language'];
+          $form['comment_alter']['old'][$field] = array(
+            '#type' => 'value',
+            '#value' => array($field_language => $node->{$field}[$field_language]),
+          );
+          $form['comment_alter']['new'][$field] = $full_form[$field];
+          // TODO: This doesn't seem to be working properly: if the extra field
+          // is set to last, it even gets displayed above comment subject.
+          $form['comment_alter']['new'][$field]['#weight'] = $field_info[$field]['weight'];
+        }
       }
-      $form['comment_alter']['#tree'] = TRUE;
-      $form['comment_alter']['old_vid'] = array(
-        '#type' => 'value',
-        '#value' => $node->vid,
-      );
+
+      if (!empty($form['comment_alter'])) {
+        $form['comment_alter']['#tree'] = TRUE;
+        $form['comment_alter']['old_vid'] = array(
+          '#type' => 'value',
+          '#value' => $node->vid,
+        );
+      }
     }
   }
 }
@@ -98,14 +106,14 @@ function comment_alter_form_alter(&$form, &$form_state, $form_id) {
 function comment_alter_comment_insert($comment) {
   // Do not try to save anything if there is nothing that was allowed to be
   // changed from the comment form.
-  if (isset($comment->comment_alter['new'])) {
+  if (isset($comment->comment_alter)) {
     $node = node_load($comment->nid);
     $node_changed = FALSE;
     foreach ($comment->comment_alter['new'] as $field => $value) {
       if ($comment->comment_alter['old'][$field] != $value) {
         foreach ($value[$node->language] as $delta => $deltavalue) {
           foreach ($deltavalue as $subfield => $subvalue) {
-            if ($comment->comment_alter['old'][$field][$delta][$subfield] != $subvalue) {
+            if ($comment->comment_alter['old'][$field][$node->language][$delta][$subfield] != $subvalue) {
               $node_changed = TRUE;
               $node->{$field}[$node->language][$delta][$subfield] = $subvalue;
             }
