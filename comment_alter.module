@@ -14,9 +14,9 @@
  *
  * @see comment_alter_form_field_ui_field_edit_form_alter_submit()
  */
-function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state) {
-  // Image fields are not supported by now, peroid.
-  if ($form['#field']['type'] == 'image') {
+function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
+  // Image fields and file fields are not supported by now, peroid.
+  if ($form['#field']['type'] == 'image' || $form['#field']['type'] == 'file') {
     return;
   }
   if ($form['instance']['entity_type']['#value'] == 'node') {
