@@ -67,7 +67,7 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
     // $field_alias holds the original and the prefixed field name pairs.
     $field_alias = array();
     foreach ($field_infos as $field_name => $value) {
-      if (preg_match('/^ca_/', $field_name)) {
+      if (substr($field_name, 0, 14) == 'comment_alter_') {
         $field_alias[substr($field_name, 3)] = $field_name;
       }
     }
@@ -237,7 +237,7 @@ function comment_alter_field_extra_fields() {
     $weight = 0;
     foreach ($comment_alter_fields as $field_name) {
       $field = field_info_instance('node', $field_name, $type->type);
-      $return['comment']['comment_node_' . $type->type]['form']['ca_' . $field_name] = array(
+      $return['comment']['comment_node_' . $type->type]['form']['comment_alter_' . $field_name] = array(
         'label' => $field['label'],
         'description' => $field['description'],
         'weight' => $weight,
