@@ -39,17 +39,3 @@ function comment_alter_schema() {
   );
   return $schema;
 }
-
-/**
- * Implements hook_uninstall().
- */
-function comment_alter_uninstall() {
-  $vars = db_select('variable', 'v')
-    ->fields('v', array('name'))
-    ->condition('v.name', 'comment_alter_%', 'LIKE')
-    ->execute()
-    ->fetchAll();
-  foreach ($vars as $var) {
-    variable_del($var->name);
-  }
-}

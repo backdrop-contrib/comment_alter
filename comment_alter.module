@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  * @file
@@ -20,108 +19,112 @@ function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state,
     return;
   }
   if ($form['instance']['entity_type']['#value'] == 'node') {
-    $form['#comment_alter'] = array(
-      '#type' => 'value',
-      '#value' => variable_get('comment_alter_' . $form['instance']['bundle']['#value'], array()),
-    );
+    // Additional custom field values will be automatically stored in the
+    // database, so custom save mechanism is not necessary.
     $form['instance']['comment_alter'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enable altering this field from comments.'),
       '#weight' => $form['instance']['required']['#weight'] + 0.5,
-      '#default_value' => isset($form['#comment_alter']['#value'][$form['instance']['field_name']['#value']]) ? $form['#comment_alter']['#value'][$form['instance']['field_name']['#value']] : FALSE,
+      '#default_value' => !empty($form['#instance']['comment_alter']),
     );
-    $form['#submit'][] = 'comment_alter_form_field_ui_field_edit_form_alter_submit';
-    // XXX: Check if this submit callback needed at all, or the checkbox
-    // status gets stored to the field (instance) settings.
   }
 }
 
 /**
- * Stores status of comment-alterable checkbox.
+ * Implements hook_form_BASE_FORM_ID_alter().
  *
- * @see comment_alter_form_field_ui_field_edit_form_alter()
+ * @see comment_alter_comment_insert()
  */
-function comment_alter_form_field_ui_field_edit_form_alter_submit($form, &$form_state) {
-  // Store only those field names that have been set to be comment-alterable
-  // for performance reasons.
-  $comment_alter = $form['#comment_alter']['#value'];
-  $comment_alter[$form['instance']['field_name']['#value']] = $form_state['values']['instance']['comment_alter'];
-  $comment_alter = array_filter($comment_alter);
-  variable_set('comment_alter_' . $form['instance']['bundle']['#value'], $comment_alter);
-}
+function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
+  $node = $form['#node'];
+  $field_infos = field_info_instances('node', $node->type);
+  $comment_alter_fields = array();
+  foreach ($field_infos as $field_name => $value) {
+    if (!empty($value['comment_alter'])) {
+      $comment_alter_fields[] = $field_name;
+    }
+  }
+  // Add widgets to comment form if comment form is new,
+  // and if comment alter fields are available.
+  if (empty($form['cid']['#value']) && !empty($comment_alter_fields)) {
+    // OK, let's twist things a little bit. Save our precious $form, call
+    // field_attach_form() which modifies it (by adding the fields),
+    // save the full form with all the fields, restore our precious saved
+    // form without the fields, and add only the needed fields to it.
+    // Simple, isn't it? Weird, but works; patches welcome for a less
+    // resource-hungry version (or simply 'better', by any means).
+    $precious_form = $form;
+    field_attach_form('node', $node, $form, $form_state, $node->language);
+    $full_form = $form;
+    $form = $precious_form;
 
+    // Every comment alter field goes to the root of the comment form so
+    // this enables that other modules can re-order or group the fields.
+    // Because fields go to the root of the comment form, they get a
+    // prefix to avoid conflicts with another modules or fields. This
+    // prefix comes from comment_alter_field_extra_fields().
+    $field_infos = field_info_extra_fields('comment', 'comment_node_' . $node->type, 'form');
+    // $field_alias holds the original and the prefixed field name pairs.
+    $field_alias = array();
+    foreach ($field_infos as $field_name => $value) {
+      if (preg_match('/^ca_/', $field_name)) {
+        $field_alias[substr($field_name, 3)] = $field_name;
+      }
+    }
 
-/**
- * Implements hook_form_alter().
- */
-function comment_alter_form_alter(&$form, &$form_state, $form_id) {
-  if ($form['#id'] == 'comment-form') {
-    $edit_comment = !empty($form['cid']['#value']);
-    $node = $form['#node'];
-    $type = node_type_get_type($node);
-    $comment_alter_fields = array_keys(variable_get('comment_alter_' . $node->type, array()));
-    // Add widgets to comment form if comment form is new,
-    // and if comment alter fields are available.
-    if (empty($form['cid']['#value']) && !empty($comment_alter_fields)) {
-      // OK, let's twist things a little bit. Save our precious $form, call
-      // field_attach_form() which modifies it (by adding the fields),
-      // save the full form with all the fields, restore our precious saved
-      // form without the fields, and add only the needed fields to it.
-      // Simple, isn't it? Weird, but works; patches welcome for a less
-      // resource-hungry version (or simply 'better', by any means).
-      $precious_form = $form;
-      field_attach_form('node', $node, $form, $form_state, $node->language);
-      $full_form = $form;
-      $form = $precious_form;
-      $field_info = field_info_extra_fields('comment', 'comment_node_' . $node->type, 'form');
-
-      foreach ($comment_alter_fields as $field) {
-        if (!empty($full_form[$field]) && $full_form[$field]['#access']) {
-          $field_language = $full_form[$field]['#language'];
-          $form['comment_alter']['old'][$field] = array(
-            '#type' => 'value',
-            '#value' => array($field_language => $node->{$field}[$field_language]),
-          );
-          $form['comment_alter']['new'][$field] = $full_form[$field];
-          // TODO: This doesn't seem to be working properly: if the extra field
-          // is set to last, it even gets displayed above comment subject.
-          $form['comment_alter']['new'][$field]['#weight'] = $field_info[$field]['weight'];
+    $alterable_fields = array();
+    foreach ($comment_alter_fields as $field_name) {
+      if (!empty($full_form[$field_name]) && $full_form[$field_name]['#access']) {
+        $field_language = $full_form[$field_name]['#language'];
+        $field_value = array();
+        // Not sure that there is a language key in the field if
+        // the field value is empty.
+        if (!empty($node->{$field_name}[$field_language])) {
+          $field_value[$field_language] = $node->{$field_name}[$field_language];
         }
-      }
-
-      if (!empty($form['comment_alter'])) {
-        $form['comment_alter']['#tree'] = TRUE;
-        $form['comment_alter']['old_vid'] = array(
+        $form[$field_alias[$field_name] . '_old'] = array(
           '#type' => 'value',
-          '#value' => $node->vid,
+          '#value' => $field_value,
         );
+        $form[$field_alias[$field_name]] = $full_form[$field_name];
+        // TODO: This doesn't seem to be working properly: if the extra field
+        // is set to last, it even gets displayed above comment subject.
+        $form[$field_alias[$field_name]]['#weight'] = $field_infos[$field_alias[$field_name]]['weight'];
+
+        $alterable_fields[$field_name] = $field_alias[$field_name];
       }
+    }
+
+    if (!empty($alterable_fields)) {
+      $form['comment_alter'] = array(
+        '#type' => 'value',
+        '#value' => array('fields' => $alterable_fields, 'old_vid' => $node->vid),
+      );
     }
   }
 }
 
 /**
  * Implements hook_comment_insert().
+ *
+ * @see comment_alter_form_comment_form_alter()
  */
 function comment_alter_comment_insert($comment) {
   // Do not try to save anything if there is nothing that was allowed to be
   // changed from the comment form.
   if (isset($comment->comment_alter)) {
-    $node = node_load($comment->nid);
-    $node_changed = FALSE;
-    foreach ($comment->comment_alter['new'] as $field => $value) {
-      if ($comment->comment_alter['old'][$field] != $value) {
-        foreach ($value[$node->language] as $delta => $deltavalue) {
-          foreach ($deltavalue as $subfield => $subvalue) {
-            if ($comment->comment_alter['old'][$field][$node->language][$delta][$subfield] != $subvalue) {
-              $node_changed = TRUE;
-              $node->{$field}[$node->language][$delta][$subfield] = $subvalue;
-            }
-          }
-        }
+    $changed_fields = array();
+    foreach ($comment->comment_alter['fields'] as $field => $field_alias) {
+      if ($comment->{$field_alias . '_old'} != $comment->{$field_alias}) {
+        $changed_fields[$field] = $field_alias;
       }
     }
-    if ($node_changed) {
+
+    if (!empty($changed_fields)) {
+      $node = node_load($comment->nid);
+      foreach ($changed_fields as $field => $field_alias) {
+        $node->{$field} = $comment->{$field_alias};
+      }
       // Creating a new node revision regardless the node type settings.
       $node->revision = TRUE;
       node_save($node);
@@ -132,7 +135,6 @@ function comment_alter_comment_insert($comment) {
       );
       drupal_write_record('comment_alter', $comment_alter);
     }
-    // Unsetting $comment->comment_alter is not needed.
   }
 }
 
@@ -153,7 +155,7 @@ function comment_alter_comment_load($comments) {
  * @see diff_diffs_show()
  */
 function comment_alter_comment_view($comment, $view_mode, $langcode) {
-  if (($view_mode == 'full') && isset($comment->comment_alter) && isset($comment->comment_alter['old_vid']) && !empty($comment->comment_alter['old_vid'])) {
+  if (($view_mode == 'full') && isset($comment->comment_alter)) {
     $node = node_load($comment->nid);
     $old_vid = &$comment->comment_alter['old_vid'];
     $new_vid = &$comment->comment_alter['new_vid'];
@@ -225,11 +227,17 @@ function comment_alter_comment_delete($comment) {
 function comment_alter_field_extra_fields() {
   $return = array();
   foreach (node_type_get_types() as $type) {
-    $comment_alter_fields = array_keys(variable_get('comment_alter_' . $type->type, array()));
+    $field_infos = field_info_instances('node', $type->type);
+    $comment_alter_fields = array();
+    foreach ($field_infos as $field_name => $value) {
+      if (!empty($value['comment_alter'])) {
+        $comment_alter_fields[] = $field_name;
+      }
+    }
     $weight = 0;
     foreach ($comment_alter_fields as $field_name) {
       $field = field_info_instance('node', $field_name, $type->type);
-      $return['comment']['comment_node_' . $type->type]['form'][$field_name] = array(
+      $return['comment']['comment_node_' . $type->type]['form']['ca_' . $field_name] = array(
         'label' => $field['label'],
         'description' => $field['description'],
         'weight' => $weight,
