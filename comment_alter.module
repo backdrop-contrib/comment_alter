@@ -142,6 +142,7 @@ function comment_alter_comment_insert($comment) {
  * Implements hook_comment_load().
  */
 function comment_alter_comment_load($comments) {
+  // FIXME: Clean up this mess with proper DBTNG calls.
   $result = db_query('SELECT cid, old_vid, new_vid FROM {comment_alter} WHERE cid IN (:cids)', array(':cids' => array_keys($comments)));
   foreach ($result as $row) {
     $comments[$row->cid]->comment_alter['old_vid'] = $row->old_vid;
@@ -157,53 +158,85 @@ function comment_alter_comment_load($comments) {
 function comment_alter_comment_view($comment, $view_mode, $langcode) {
   if (($view_mode == 'full') && isset($comment->comment_alter)) {
     $node = node_load($comment->nid);
-    $old_vid = &$comment->comment_alter['old_vid'];
-    $new_vid = &$comment->comment_alter['new_vid'];
     module_load_include('inc', 'diff', 'diff.pages');
-
-    // A stripped-down version of diff_diffs_show().
-    // Attaches the CSS.
-    $build['#attached'] = diff_build_attachments();
-    $state = variable_get('diff_default_state_node', 'raw');
-    $node_revisions = node_revision_list($node);
-    $old_node = node_load($node->nid, $old_vid);
-    $new_node = node_load($node->nid, $new_vid);
-    // Generate table header (date, username, log message).
-    $old_header = t('!date by !username', array(
-      '!date' => l(format_date($old_node->revision_timestamp), "node/$node->nid/revisions/$old_node->vid/view", array('absolute' => 1)),
-      '!username' => theme('username', array('account' => $node_revisions[$old_vid])),
-    ));
-    $new_header = t('!date by !username', array(
-      '!date' => l(format_date($new_node->revision_timestamp), "node/$node->nid/revisions/$new_node->vid/view", array('absolute' => 1)),
-      '!username' => theme('username', array('account' => $node_revisions[$new_vid])),
-    ));
-    $old_log = $old_node->log != '' ? '<p class="revision-log">' . filter_xss($old_node->log) . '</p>' : '';
-    $new_log = $new_node->log != '' ? '<p class="revision-log">' . filter_xss($new_node->log) . '</p>' : '';
-    $header = _diff_default_header($old_header, $new_header);
-    $rows = array();
-    if ($old_log || $new_log) {
-      $rows['logs'] = array(
-        array(
-          'data' => $old_log,
-          'colspan' => 2,
-        ),
-        array(
-          'data' => $new_log,
-          'colspan' => 2,
-        ),
-      );
-    }
-    $rows = array_merge($rows, _diff_body_rows($old_node, $new_node, $state));
-    $build['diff_table'] = array(
-      '#theme' => 'table__diff__standard',
-      '#header' => $header,
-      '#rows' => $rows,
-      '#attributes' => array('class' => array('diff')),
-      '#colgroups' => _diff_default_cols(),
-      '#sticky' => FALSE,
+    $old_node = node_load($comment->nid, $comment->comment_alter['old_vid']);
+    $new_node = node_load($comment->nid, $comment->comment_alter['new_vid']);
+    $context = array(
+      'entity_type' => 'node',
+      'states' => array('raw'),
+      'view_mode' => 'diff_standard',
+      'language' => $langcode,
     );
-    $comment->content['comment_alter'] = $build;
+    $field_infos = field_info_instances('node', $node->type);
+    $comment_alter_fields = array();
+    foreach ($field_infos as $field_name => $value) {
+      if (!empty($value['comment_alter'])) {
+        $comment_alter_fields[] = $field_name;
+      }
+    }
+    $diffs = diff_compare_entities($old_node, $new_node, $context);
+
+    $rows = array();
+    foreach ($diffs as $field_name => $diff) {
+      // Only compare fields marked as 'comment_alter',
+      if (in_array($field_name, $comment_alter_fields)) {
+        list ($old, $new) = diff_extract_state($diff, $context['states'][0]);
+        if ($old != $new) {
+          $rows[] = array(
+            'name' => $diff['#name'],
+            'old' => $old,
+            'new' => $new,
+          );
+        }
+      }
+    }
+    $comment->content['comment_alter'] = array(
+      '#theme' => 'comment_alter_diff',
+      '#changed_fields' => $rows,
+    );
   }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function comment_alter_theme() {
+  $return = array();
+  $return['comment_alter_diff'] = array(
+    'variables' => array('changed_fields' => array()),
+  );
+  return $return;
+}
+
+/**
+ * Returns HTML for changes made by comment_alter.
+ *
+ * @param array $variables
+ *   An associative array containing:
+ *   - changed_fields: an array of changed fields, with these indexes:
+ *     - name: field's name being changed.
+ *     - old: array of old field values.
+ *     - new: array of new field values.
+ *
+ * @ingroup themeable
+ */
+function theme_comment_alter_diff(&$variables) {
+  $rows = array();
+  foreach ($variables['changed_fields'] as $field) {
+    $rows[] = array(
+      $field['name'] . ':',
+      implode(', ', $field['old']),
+      '&raquo;',
+      implode(', ', $field['new']),
+    );
+  }
+  drupal_add_css(drupal_get_path('module', 'comment_alter') . '/comment_alter.css');
+  return theme('table', array(
+    '#theme' => 'table__comment_alter__diff',
+    '#rows' => $rows,
+    '#attributes' => array('class' => array('comment-alter-diff')),
+    '#sticky' => FALSE,
+  ));
 }
 
 /**
