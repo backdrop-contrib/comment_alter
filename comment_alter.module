@@ -68,7 +68,7 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
     $field_alias = array();
     foreach ($field_infos as $field_name => $value) {
       if (substr($field_name, 0, 14) == 'comment_alter_') {
-        $field_alias[substr($field_name, 3)] = $field_name;
+        $field_alias[substr($field_name, 14)] = $field_name;
       }
     }
 
