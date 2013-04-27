@@ -31,19 +31,35 @@ function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state,
 }
 
 /**
+ * Returns the comment-alterable fields for a content type.
+ *
+ * @param string $content_type
+ *   Node object, at least with the type property.
+ * @return array
+ *   Array of the comment-alterable fields for that content type.
+ */
+function comment_alter_get_alterable_fields($content_type) {
+  $comment_alter_fields = &drupal_static(__FUNCTION__);
+  if (!isset($comment_alter_fields[$content_type])) {
+    $field_infos = field_info_instances('node', $content_type);
+    $comment_alter_fields[$content_type] = array();
+    foreach ($field_infos as $field_name => $value) {
+      if (!empty($value['comment_alter'])) {
+        $comment_alter_fields[$content_type][] = $field_name;
+      }
+    }
+  }
+  return $comment_alter_fields[$content_type];
+}
+
+/**
  * Implements hook_form_BASE_FORM_ID_alter().
  *
  * @see comment_alter_comment_insert()
  */
 function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
   $node = $form['#node'];
-  $field_infos = field_info_instances('node', $node->type);
-  $comment_alter_fields = array();
-  foreach ($field_infos as $field_name => $value) {
-    if (!empty($value['comment_alter'])) {
-      $comment_alter_fields[] = $field_name;
-    }
-  }
+  $comment_alter_fields = comment_alter_get_alterable_fields($node->type);
   // Add widgets to comment form if comment form is new,
   // and if comment alter fields are available.
   if (empty($form['cid']['#value']) && !empty($comment_alter_fields)) {
@@ -57,7 +73,6 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
     field_attach_form('node', $node, $form, $form_state, $node->language);
     $full_form = $form;
     $form = $precious_form;
-
     // Every comment alter field goes to the root of the comment form so
     // this enables that other modules can re-order or group the fields.
     // Because fields go to the root of the comment form, they get a
@@ -71,7 +86,6 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
         $field_alias[substr($field_name, 14)] = $field_name;
       }
     }
-
     $alterable_fields = array();
     foreach ($comment_alter_fields as $field_name) {
       if (!empty($full_form[$field_name]) && $full_form[$field_name]['#access']) {
@@ -94,7 +108,6 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
         $alterable_fields[$field_name] = $field_alias[$field_name];
       }
     }
-
     if (!empty($alterable_fields)) {
       $form['comment_alter'] = array(
         '#type' => 'value',
@@ -167,15 +180,8 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
       'view_mode' => 'diff_standard',
       'language' => $langcode,
     );
-    $field_infos = field_info_instances('node', $node->type);
-    $comment_alter_fields = array();
-    foreach ($field_infos as $field_name => $value) {
-      if (!empty($value['comment_alter'])) {
-        $comment_alter_fields[] = $field_name;
-      }
-    }
+    $comment_alter_fields = comment_alter_get_alterable_fields($node->type);
     $diffs = diff_compare_entities($old_node, $new_node, $context);
-
     $rows = array();
     foreach ($diffs as $field_name => $diff) {
       // Only compare fields marked as 'comment_alter',
@@ -260,13 +266,7 @@ function comment_alter_comment_delete($comment) {
 function comment_alter_field_extra_fields() {
   $return = array();
   foreach (node_type_get_types() as $type) {
-    $field_infos = field_info_instances('node', $type->type);
-    $comment_alter_fields = array();
-    foreach ($field_infos as $field_name => $value) {
-      if (!empty($value['comment_alter'])) {
-        $comment_alter_fields[] = $field_name;
-      }
-    }
+    $comment_alter_fields = comment_alter_get_alterable_fields($type->type);
     $weight = 0;
     foreach ($comment_alter_fields as $field_name) {
       $field = field_info_instance('node', $field_name, $type->type);
