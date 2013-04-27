@@ -277,6 +277,13 @@ function comment_alter_field_extra_fields() {
       );
       $weight++;
     }
+    if (!empty($comment_alter_fields)) {
+      $return['comment']['comment_node_' . $type->type]['display']['comment_alter'] = array(
+        'label' => t('Comment changes'),
+        'description' => t('Changes made to the parent node\'s fields in this comment.'),
+        'weight' => -1,
+      );
+    }
   }
   return $return;
 }
