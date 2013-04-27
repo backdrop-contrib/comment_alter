@@ -25,7 +25,7 @@ function comment_alter_schema() {
         'default' => 0,
       ),
       'new_vid' => array(
-        'description' => 'The old {node}.vid this change refers to.',
+        'description' => 'The new {node}.vid this change refers to.',
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
