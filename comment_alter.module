@@ -15,7 +15,9 @@
  */
 function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
   // Image fields and file fields are not supported by now, peroid.
-  if ($form['#field']['type'] == 'image' || $form['#field']['type'] == 'file') {
+  // Field collection not currently supported by Diff module.
+  // @see http://drupal.org/node/1897196
+  if ($form['#field']['type'] == 'image' || $form['#field']['type'] == 'file' || $form['#field']['type'] == 'field_collection') {
     return;
   }
   if ($form['instance']['entity_type']['#value'] == 'node') {
