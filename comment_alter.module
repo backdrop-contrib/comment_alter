@@ -88,7 +88,16 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
         $field_alias[substr($field_name, 14)] = $field_name;
       }
     }
+    // The comment_alter_comment_insert() function needs these two arrays.
+    // This one informs about comment_alterable fields, key is node field
+    // machine name, value is comment form element name (eg. field_foo becomes
+    // comment_alter_field_foo, to avoid namespace clashes).
     $alterable_fields = array();
+    // This one informs about comment_alterable columns per comment_alterable
+    // fields. First-level key is the comment form element name (see the
+    // previous one), second-level keys (and values) are the columns which do
+    // have their form elements.
+    $alterable_columns = array();
     foreach ($comment_alter_fields as $field_name) {
       if (!empty($full_form[$field_name]) && $full_form[$field_name]['#access']) {
         $field_language = $full_form[$field_name]['#language'];
@@ -108,13 +117,46 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
         $form[$field_alias[$field_name]]['#weight'] = $field_infos[$field_alias[$field_name]]['weight'];
 
         $alterable_fields[$field_name] = $field_alias[$field_name];
+        foreach (element_children($form[$field_alias[$field_name]]) as $language) {
+          foreach (element_children($form[$field_alias[$field_name]][$language]) as $delta) {
+            foreach (element_children($form[$field_alias[$field_name]][$language][$delta]) as $column) {
+              $alterable_columns[$field_alias[$field_name]][$column] = $column;
+            }
+          }
+        }
       }
     }
     if (!empty($alterable_fields)) {
+      // Push down the information gathered to comment_alter_comment_insert().
       $form['comment_alter'] = array(
         '#type' => 'value',
-        '#value' => array('fields' => $alterable_fields, 'old_vid' => $node->vid),
+        '#value' => array(
+          'fields' => $alterable_fields,
+          'old_vid' => $node->vid,
+          'alterable_columns' => $alterable_columns,
+        ),
       );
+    }
+  }
+}
+
+/**
+ * Helper function to recursively clean up semi-empty arrays.
+ *
+ * Eg. array('foo' => array('bar' => array('baz' => ''))) becomes array().
+ *
+ * @param array $a
+ *   Array whose empty elements should be removed.
+ */
+function _comment_alter_cleanup(&$a) {
+  if (is_array($a)) {
+    foreach ($a as $key => &$value) {
+      if (is_array($value)) {
+        _comment_alter_cleanup($value);
+      }
+      if (empty($value)) {
+        unset($a[$key]);
+      }
     }
   }
 }
@@ -130,6 +172,23 @@ function comment_alter_comment_insert($comment) {
   if (isset($comment->comment_alter)) {
     $changed_fields = array();
     foreach ($comment->comment_alter['fields'] as $field => $field_alias) {
+      $field_alias_old = $field_alias . '_old';
+      _comment_alter_cleanup($comment->{$field_alias});
+      // Old values may have extra information in additional fields/columns
+      // without having form elements. We need to get rid of this information
+      // to be able to properly compare the new values (coming from the form)
+      // with the old values (coming from a node object in
+      // comment_alter_form_comment_form_alter()).
+      foreach ($comment->{$field_alias_old} as $language => $deltas) {
+        foreach ($comment->{$field_alias_old}[$language] as $delta => $columns) {
+          foreach ($comment->{$field_alias_old}[$language][$delta] as $column => $value) {
+            if (!isset($comment->comment_alter['alterable_columns'][$field_alias][$column])) {
+              unset($comment->{$field_alias_old}[$language][$delta][$column]);
+            }
+          }
+        }
+      }
+      _comment_alter_cleanup($comment->{$field_alias_old});
       if ($comment->{$field_alias . '_old'} != $comment->{$field_alias}) {
         $changed_fields[$field] = $field_alias;
       }
