@@ -120,6 +120,14 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
         foreach (element_children($form[$field_alias[$field_name]]) as $language) {
           foreach (element_children($form[$field_alias[$field_name]][$language]) as $delta) {
             foreach (element_children($form[$field_alias[$field_name]][$language][$delta]) as $column) {
+              // Ignore weight changes for now, as I don't yet know how to
+              // properly handle the following changes:
+              // - if the only change is the order;
+              // - if there are multiple values already and the last element is
+              //   left empty (its weight is not empty(), so it gets stored).
+              if ($column === '_weight') {
+                continue;
+              }
               $alterable_columns[$field_alias[$field_name]][$column] = $column;
             }
           }
@@ -173,6 +181,24 @@ function comment_alter_comment_insert($comment) {
     $changed_fields = array();
     foreach ($comment->comment_alter['fields'] as $field => $field_alias) {
       $field_alias_old = $field_alias . '_old';
+      // Multiple-value fields should not have an 'add_more' delta (this comes
+      // from the Field API's Form API stuff: 'add_more' delta is the 'Add more'
+      // button.
+      foreach ($comment->{$field_alias} as $language => $deltas) {
+        foreach ($comment->{$field_alias}[$language] as $delta => $columns) {
+          if ($delta === 'add_more') {
+            unset($comment->{$field_alias}[$language][$delta]);
+            continue;
+          }
+          // Non-alterable columns (eg. _weight) should be removed (from
+          // comparison).
+          foreach ($comment->{$field_alias}[$language][$delta] as $column => $value) {
+            if (!isset($comment->comment_alter['alterable_columns'][$field_alias][$column])) {
+              unset($comment->{$field_alias}[$language][$delta][$column]);
+            }
+          }
+        }
+      }
       _comment_alter_cleanup($comment->{$field_alias});
       // Old values may have extra information in additional fields/columns
       // without having form elements. We need to get rid of this information
@@ -181,6 +207,10 @@ function comment_alter_comment_insert($comment) {
       // comment_alter_form_comment_form_alter()).
       foreach ($comment->{$field_alias_old} as $language => $deltas) {
         foreach ($comment->{$field_alias_old}[$language] as $delta => $columns) {
+          if ($delta === 'add_more') {
+            unset($comment->{$field_alias}[$language][$delta]);
+            continue;
+          }
           foreach ($comment->{$field_alias_old}[$language][$delta] as $column => $value) {
             if (!isset($comment->comment_alter['alterable_columns'][$field_alias][$column])) {
               unset($comment->{$field_alias_old}[$language][$delta][$column]);
