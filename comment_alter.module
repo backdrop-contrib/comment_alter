@@ -117,20 +117,22 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
         $form[$field_alias[$field_name]]['#weight'] = $field_infos[$field_alias[$field_name]]['weight'];
 
         $alterable_fields[$field_name] = $field_alias[$field_name];
-        foreach (element_children($form[$field_alias[$field_name]]) as $language) {
-          foreach (element_children($form[$field_alias[$field_name]][$language]) as $delta) {
-            foreach (element_children($form[$field_alias[$field_name]][$language][$delta]) as $column) {
-              // Ignore weight changes for now, as I don't yet know how to
-              // properly handle the following changes:
-              // - if the only change is the order;
-              // - if there are multiple values already and the last element is
-              //   left empty (its weight is not empty(), so it gets stored).
-              if ($column === '_weight') {
-                continue;
-              }
-              $alterable_columns[$field_alias[$field_name]][$column] = $column;
-            }
-          }
+        $field_items = $form[$field_alias[$field_name]][$field_language];
+        // Fetch the alterable columns from field items themselves. If the
+        // #column info is available at the top-level (eg. in the case of a
+        // select), grab it from there; in other cases, grab it from the first
+        // item.
+        // Note: weight changes (changes in order of multivalue fields' values)
+        // are not tracked.
+        if (isset($field_items['#columns'])) {
+          $columns = $field_items['#columns'];
+        }
+        else {
+          $field_item = reset($field_items[0]);
+          $columns = $field_item['#columns'];
+        }
+        foreach ($columns as $column) {
+          $alterable_columns[$field_alias[$field_name]][$column] = $column;
         }
       }
     }
