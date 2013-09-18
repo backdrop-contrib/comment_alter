@@ -65,16 +65,18 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
   // Add widgets to comment form if comment form is new,
   // and if comment alter fields are available.
   if (empty($form['cid']['#value']) && !empty($comment_alter_fields)) {
-    // OK, let's twist things a little bit. Save our precious $form, call
-    // field_attach_form() which modifies it (by adding the fields),
-    // save the full form with all the fields, restore our precious saved
-    // form without the fields, and add only the needed fields to it.
-    // Simple, isn't it? Weird, but works; patches welcome for a less
-    // resource-hungry version (or simply 'better', by any means).
-    $precious_form = $form;
-    field_attach_form('node', $node, $form, $form_state, $node->language);
-    $full_form = $form;
-    $form = $precious_form;
+    // OK, let's dig up the fields from the appropriate node form. It would be
+    // a little bit less resource-hungry to save our precious (comment) $form,
+    // call field_attach_form() to modify it (by adding the node fields), save
+    // the full form with all the fields, restore our precious saved form
+    // without the fields, and add only the needed fields to it, but it does
+    // not work well enough (for example, some mix of Organic Group and
+    // Entityreference to users is somewhat broken this way). So we have to(?)
+    // build the whole node form and retrieve the needed field widgets from
+    // there. Anyway, patches welcome for a less resource-hungry version (or
+    // simply 'better', by any means).
+    module_load_include('inc', 'node', 'node.pages');
+    $node_form = drupal_get_form($node->type . '_node_form', $node);
     // Every comment alter field goes to the root of the comment form so
     // this enables that other modules can re-order or group the fields.
     // Because fields go to the root of the comment form, they get a
@@ -99,8 +101,8 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
     // have their form elements.
     $alterable_columns = array();
     foreach ($comment_alter_fields as $field_name) {
-      if (!empty($full_form[$field_name]) && $full_form[$field_name]['#access']) {
-        $field_language = $full_form[$field_name]['#language'];
+      if (!empty($node_form[$field_name]) && $node_form[$field_name]['#access']) {
+        $field_language = $node_form[$field_name]['#language'];
         $field_value = array();
         // Not sure that there is a language key in the field if
         // the field value is empty.
@@ -111,7 +113,7 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
           '#type' => 'value',
           '#value' => $field_value,
         );
-        $form[$field_alias[$field_name]] = $full_form[$field_name];
+        $form[$field_alias[$field_name]] = $node_form[$field_name];
         // TODO: This doesn't seem to be working properly: if the extra field
         // is set to last, it even gets displayed above comment subject.
         $form[$field_alias[$field_name]]['#weight'] = $field_infos[$field_alias[$field_name]]['weight'];
