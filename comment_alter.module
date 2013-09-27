@@ -104,11 +104,14 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
       if (!empty($node_form[$field_name]) && $node_form[$field_name]['#access']) {
         $field_language = $node_form[$field_name]['#language'];
         $field_value = array();
-        // Not sure that there is a language key in the field if
-        // the field value is empty.
+        // Not sure that there is a language key in the field if the field value
+        // is empty.
         if (!empty($node->{$field_name}[$field_language])) {
           $field_value[$field_language] = $node->{$field_name}[$field_language];
         }
+        // Comment_alterable node fields must be amongst the comment fields
+        // themselves in order to be able to properly weight/reorderd them, put
+        // them into a field_group, etc. on the manage comment fields form.
         $form[$field_alias[$field_name] . '_old'] = array(
           '#type' => 'value',
           '#value' => $field_value,
@@ -118,6 +121,18 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
         // is set to last, it even gets displayed above comment subject.
         $form[$field_alias[$field_name]]['#weight'] = $field_infos[$field_alias[$field_name]]['weight'];
 
+        // Our custom fields should be named so that hook_comment_insert() will
+        // recognize them later on.
+        $form[$field_alias[$field_name]][$field_language]['#name'] = 'comment_alter_' . $form[$field_alias[$field_name]][$field_language]['#name'];
+        $form[$field_alias[$field_name]][$field_language]['#field_name'] = $field_alias[$field_name];
+        // Their names are reflected in #parents and #array_parents as well.
+        $form[$field_alias[$field_name]]['#parents'][0] = $field_alias[$field_name];
+        $form[$field_alias[$field_name]]['#array_parents'][0] = $field_alias[$field_name];
+        $form[$field_alias[$field_name]][$field_language]['#parents'][0] = $field_alias[$field_name];
+        $form[$field_alias[$field_name]][$field_language]['#array_parents'][0] = $field_alias[$field_name];
+        // If this #value is left set, the user will not be able to change the
+        // field's value.
+        unset($form[$field_alias[$field_name]][$field_language]['#value']);
         $alterable_fields[$field_name] = $field_alias[$field_name];
         $field_items = $form[$field_alias[$field_name]][$field_language];
         // Fetch the alterable columns from field items themselves. If the
@@ -365,6 +380,9 @@ function comment_alter_field_extra_fields() {
     $weight = 0;
     foreach ($comment_alter_fields as $field_name) {
       $field = field_info_instance('node', $field_name, $type->type);
+      // Comment_alterable node fields must be amongst the comment fields
+      // themselves in order to be able to properly weight/reorderd them, put
+      // them into a field_group, etc. on the manage comment fields form.
       $return['comment']['comment_node_' . $type->type]['form']['comment_alter_' . $field_name] = array(
         'label' => $field['label'],
         'description' => $field['description'],
