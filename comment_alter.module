@@ -250,6 +250,12 @@ function comment_alter_comment_insert($comment) {
       }
       // Creating a new node revision regardless the node type settings.
       $node->revision = TRUE;
+      // Disable node updated notifications that caused by comment_alter.
+      // New comment notifications should be enough - this happens when
+      // submitting a comment, not when editing a node, after all.
+      if (module_exists('notifications_content')) {
+        $node->notifications_content_disable = TRUE;
+      }
       node_save($node);
       $comment_alter = array(
         'old_vid' => $comment->comment_alter['old_vid'],
