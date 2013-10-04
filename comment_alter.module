@@ -265,8 +265,10 @@ function comment_alter_comment_insert($comment) {
  * Implements hook_comment_load().
  */
 function comment_alter_comment_load($comments) {
-  // FIXME: Clean up this mess with proper DBTNG calls.
-  $result = db_query('SELECT cid, old_vid, new_vid FROM {comment_alter} WHERE cid IN (:cids)', array(':cids' => array_keys($comments)));
+  $result = db_select('comment_alter', 'ca')
+    ->fields('ca', array('cid', 'old_vid', 'new_vid'))
+    ->condition('cid', array_keys($comments), 'IN')
+    ->execute();
   foreach ($result as $row) {
     $comments[$row->cid]->comment_alter['old_vid'] = $row->old_vid;
     $comments[$row->cid]->comment_alter['new_vid'] = $row->new_vid;
