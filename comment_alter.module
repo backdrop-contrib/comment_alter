@@ -123,29 +123,21 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
 
         // Our custom fields should be named so that hook_comment_insert() will
         // recognize them later on.
-        $form[$field_alias[$field_name]][$field_language]['#name'] = 'comment_alter_' . $form[$field_alias[$field_name]][$field_language]['#name'];
-        $form[$field_alias[$field_name]][$field_language]['#field_name'] = $field_alias[$field_name];
-        // Their names are reflected in #parents and #array_parents as well.
-        $form[$field_alias[$field_name]]['#parents'][0] = $field_alias[$field_name];
-        $form[$field_alias[$field_name]]['#array_parents'][0] = $field_alias[$field_name];
-        $form[$field_alias[$field_name]][$field_language]['#parents'][0] = $field_alias[$field_name];
-        $form[$field_alias[$field_name]][$field_language]['#array_parents'][0] = $field_alias[$field_name];
-        // If this #value is left set, the user will not be able to change the
-        // field's value.
-        unset($form[$field_alias[$field_name]][$field_language]['#value']);
+        _comment_alter_element_rename_field($form[$field_alias[$field_name]], $field_alias[$field_name]);
+        // Remember that this field is alterable.
         $alterable_fields[$field_name] = $field_alias[$field_name];
-        $field_items = $form[$field_alias[$field_name]][$field_language];
         // Fetch the alterable columns from field items themselves. If the
         // #column info is available at the top-level (eg. in the case of a
         // select), grab it from there; in other cases, grab it from the first
         // item.
         // Note: weight changes (changes in order of multivalue fields' values)
         // are not tracked.
+        $field_items = $form[$field_alias[$field_name]][$field_language];
         if (isset($field_items['#columns'])) {
           $columns = $field_items['#columns'];
         }
         else {
-          $field_item = reset($field_items[0]);
+          $field_item = $field_items[0];
           $columns = $field_item['#columns'];
         }
         foreach ($columns as $column) {
@@ -164,6 +156,37 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
         ),
       );
     }
+  }
+}
+
+/**
+ * Helper function to recursively rename a field element.
+ *
+ * Necessary to support fields with multiple values.
+ *
+ * @param array $element
+ *   Element to modify.
+ * @param string $name
+ *   The new name.
+ */
+function _comment_alter_element_rename_field(&$element, $name) {
+  if (!empty($element['#name'])) {
+    $element['#name'] = 'comment_alter_' . $element['#name'];
+  }
+  if (!empty($element['#field_name'])) {
+    $element['#field_name'] = $name;
+  }
+  // Their names are reflected in #parents and #array_parents as well.
+  $element['#parents'][0] = $name;
+  $element['#array_parents'][0] = $name;
+  // If this #value is left set, the user will not be able to change the
+  // field's value.
+  if (isset($element['#value']) && !in_array($element['#type'], array('value', 'hidden', 'submit', 'button'))) {
+    unset($element['#value']);
+  }
+  // Run recursively on children
+  foreach (element_children($element) as $child_name) {
+    _comment_alter_element_rename_field($element[$child_name], $name);
   }
 }
 

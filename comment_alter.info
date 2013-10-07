@@ -3,3 +3,4 @@ description = "Provides UI to alter nodes' parameters from comment forms."
 core = 7.x
 dependencies[] = comment
 dependencies[] = diff (3.x)
+files[] = comment_alter.test
