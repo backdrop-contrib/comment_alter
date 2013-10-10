@@ -305,12 +305,28 @@ function comment_alter_comment_load($comments) {
 }
 
 /**
- * Implements hook_comment_view().
+ * Returns the differences committed with a particular comment.
  *
- * @see diff_diffs_show()
+ * Uses the 'Diff' module to actually generate the differences.
+ *
+ * @param object $comment
+ *   The comment object.
+ * @param string $langcode
+ *   The language code used for rendering the fields.
+ *
+ * @return array
+ *   An associative array where the keys are the field names that
+ *   that changed and the values are associative arrays with 3 keys:
+ *     - name: The human readable name of the field
+ *     - old: A string representing the old value.
+ *     - new: A string representing the new value.
+ *
+ * @see diff_compare_entities() 
  */
-function comment_alter_comment_view($comment, $view_mode, $langcode) {
-  if (($view_mode == 'full') && isset($comment->comment_alter)) {
+function comment_alter_get_changed_fields($comment, $langcode) {
+  $changed_fields = array();
+
+  if (isset($comment->comment_alter)) {
     $node = node_load($comment->nid);
     module_load_include('inc', 'diff', 'diff.pages');
     $old_node = node_load($comment->nid, $comment->comment_alter['old_vid']);
@@ -323,13 +339,12 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
     );
     $comment_alter_fields = comment_alter_get_alterable_fields($node->type);
     $diffs = diff_compare_entities($old_node, $new_node, $context);
-    $rows = array();
     foreach ($diffs as $field_name => $diff) {
       // Only compare fields marked as 'comment_alter',
       if (in_array($field_name, $comment_alter_fields)) {
         list ($old, $new) = diff_extract_state($diff, $context['states'][0]);
         if ($old != $new) {
-          $rows[] = array(
+          $changed_fields[$field_name] = array(
             'name' => $diff['#name'],
             'old' => $old,
             'new' => $new,
@@ -337,9 +352,21 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
         }
       }
     }
+  }
+
+  return $changed_fields;
+}
+
+/**
+ * Implements hook_comment_view().
+ *
+ * @see diff_diffs_show()
+ */
+function comment_alter_comment_view($comment, $view_mode, $langcode) {
+  if (($view_mode == 'full') && isset($comment->comment_alter)) {
     $comment->content['comment_alter'] = array(
       '#theme' => 'comment_alter_diff',
-      '#changed_fields' => $rows,
+      '#changed_fields' => comment_alter_get_changed_fields($comment, $langcode),
     );
   }
 }
