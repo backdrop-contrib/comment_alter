@@ -317,9 +317,9 @@ function comment_alter_comment_load($comments) {
  * @return array
  *   An associative array where the keys are the field names that
  *   that changed and the values are associative arrays with 3 keys:
- *     - name: The human readable name of the field
- *     - old: A string representing the old value.
- *     - new: A string representing the new value.
+ *   - name: field's name being changed.
+ *   - old: array of old field values.
+ *   - new: array of new field values.
  *
  * @see diff_compare_entities() 
  */
@@ -367,6 +367,8 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
     $comment->content['comment_alter'] = array(
       '#theme' => 'comment_alter_diff',
       '#changed_fields' => comment_alter_get_changed_fields($comment, $langcode),
+      '#comment' => $comment,
+      '#langcode' => $langcode,
     );
   }
 }
@@ -377,7 +379,7 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
 function comment_alter_theme() {
   $return = array();
   $return['comment_alter_diff'] = array(
-    'variables' => array('changed_fields' => array()),
+    'variables' => array('changed_fields' => array(), 'comment' => NULL, 'langcode' => NULL),
   );
   return $return;
 }
@@ -391,6 +393,8 @@ function comment_alter_theme() {
  *     - name: field's name being changed.
  *     - old: array of old field values.
  *     - new: array of new field values.
+ *   - comment: Full comment object, for context.
+ *   - langcode: The language code used for rendering the fields, for context.
  *
  * @ingroup themeable
  */
