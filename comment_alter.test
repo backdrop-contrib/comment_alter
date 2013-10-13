@@ -34,12 +34,12 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
   }
 
   /**
-   * Creates a field and field instance on the $this->content_type type, returning the field name.
+   * Creates a field and field instance on the $this->content_type type.
    *
    * @param string $field_type
-   *   The field type name (ie. list_text)
+   *   The field type name (ie. list_text).
    * @parem string $widget_type
-   *   The widget name (ie. options_select)
+   *   The widget name (ie. options_select).
    * @param array $field_settings
    *   An array that gets added to the array passed to field_create_field().
    * @param array $instance_settings
@@ -66,12 +66,14 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
   }
 
   /**
-   * Creates a node programatically, than posts a comment using the psuedo browser.
+   * Create a node programmatically and post a comment using the psuedo browser.
    *
    * @param array $original_properties
-   *   An array that gets added to the array passed to $this->drupalCreateNode().
+   *   An array that gets added to the array passed to
+   *   $this->drupalCreateNode().
    * @param array $comment_edit
-   *   An array that gets added to the $edit array passed to $this->drupalPost().
+   *   An array that gets added to the $edit array passed to
+   *   $this->drupalPost().
    *
    * @see DrupalWebTestCase::drupalCreateNode()
    * @see DrupalWebTestCase::drupalPost()
@@ -82,17 +84,18 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
     ) + $original_properties);
     $this->drupalGet("node/{$node->nid}");
     $edit = array();
-    $edit["comment_body[und][0][value]"] = $this->randomName();
+    $edit['comment_body[' . LANGUAGE_NONE . '][0][value]'] = $this->randomName();
     $edit = array_merge($edit, $comment_edit);
     $this->drupalPost(NULL, $edit, t('Save'));
   }
 
   /**
-   * Asserts that a Comment Alter diff table on the current page matches expected.
+   * Asserts that a Comment Alter diff table on the current page is as expected.
    *
    * @param array $values
-   *   An associative array with keys for the field name referring to arrays with
-   *   exactly two values: the original and new value as human readable strings.
+   *   An associative array with keys for the field name referring to arrays
+   *   with exactly two values: the original and new value as human readable
+   *   strings.
    * @param (optional) int $ord
    *   If there are multiple diff tables on the page, this specifies which one
    *   in sequential order.
@@ -144,7 +147,7 @@ class CommentAlterListTextTestCase extends CommentAlterBaseTestCase {
 
     $this->createNodeThenPostComment(
       array($field_name => array('und' => array(0 => array('value' => 1)))),
-      array("comment_alter_{$field_name}[und]" => '2')
+      array("comment_alter_{$field_name}[" . LANGUAGE_NONE . ']' => '2')
     );
 
     $this->assertCommentDiff(array(
@@ -162,7 +165,7 @@ class CommentAlterListTextTestCase extends CommentAlterBaseTestCase {
 
     $this->createNodeThenPostComment(
       array($field_name => array('und' => array(0 => array('value' => 1)))),
-      array("comment_alter_{$field_name}[und][]" => array('1', '2'))
+      array("comment_alter_{$field_name}[" . LANGUAGE_NONE . '][]' => array('1', '2'))
     );
 
     $this->assertCommentDiff(array(
@@ -180,7 +183,7 @@ class CommentAlterListTextTestCase extends CommentAlterBaseTestCase {
 
     $this->createNodeThenPostComment(
       array($field_name => array('und' => array(0 => array('value' => 1)))),
-      array("comment_alter_{$field_name}[und]" => '2')
+      array("comment_alter_{$field_name}[" . LANGUAGE_NONE . ']' => '2')
     );
 
     $this->assertCommentDiff(array(
@@ -198,7 +201,7 @@ class CommentAlterListTextTestCase extends CommentAlterBaseTestCase {
 
     $this->createNodeThenPostComment(
       array($field_name => array('und' => array(0 => array('value' => 1)))),
-      array("comment_alter_{$field_name}[und][2]" => TRUE)
+      array("comment_alter_{$field_name}[" . LANGUAGE_NONE . '][2]' => TRUE)
     );
 
     $this->assertCommentDiff(array(
@@ -236,7 +239,7 @@ class CommentAlterTextTestCase extends CommentAlterBaseTestCase {
 
     $this->createNodeThenPostComment(
       array($field_name => array('und' => array(0 => array('value' => $old_value)))),
-      array("comment_alter_{$field_name}[und][0][value]" => $new_value)
+      array("comment_alter_{$field_name}[" . LANGUAGE_NONE . '][0][value]' => $new_value)
     );
 
     $this->assertCommentDiff(array(
@@ -255,7 +258,7 @@ class CommentAlterTextTestCase extends CommentAlterBaseTestCase {
 
     $this->createNodeThenPostComment(
       array($field_name => array('und' => array(0 => array('value' => $old_value)))),
-      array("comment_alter_{$field_name}[und][1][value]" => $new_value)
+      array("comment_alter_{$field_name}[" . LANGUAGE_NONE . '][1][value]' => $new_value)
     );
 
     $this->assertCommentDiff(array(

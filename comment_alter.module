@@ -179,12 +179,12 @@ function _comment_alter_element_rename_field(&$element, $name) {
   // Their names are reflected in #parents and #array_parents as well.
   $element['#parents'][0] = $name;
   $element['#array_parents'][0] = $name;
-  // If this #value is left set, the user will not be able to change the
-  // field's value.
+  // If this #value is left set, the user will not be able to change the field's
+  // value.
   if (isset($element['#value']) && !in_array($element['#type'], array('value', 'hidden', 'submit', 'button'))) {
     unset($element['#value']);
   }
-  // Run recursively on children
+  // Run recursively on children.
   foreach (element_children($element) as $child_name) {
     _comment_alter_element_rename_field($element[$child_name], $name);
   }
@@ -315,13 +315,13 @@ function comment_alter_comment_load($comments) {
  *   The language code used for rendering the fields.
  *
  * @return array
- *   An associative array where the keys are the field names that
- *   that changed and the values are associative arrays with 3 keys:
+ *   An associative array with keys being the changed field names and values
+ *   being associative arrays with 3 keys:
  *   - name: field's name being changed.
  *   - old: array of old field values.
  *   - new: array of new field values.
  *
- * @see diff_compare_entities() 
+ * @see diff_compare_entities()
  */
 function comment_alter_get_changed_fields($comment, $langcode) {
   $changed_fields = array();
@@ -340,7 +340,7 @@ function comment_alter_get_changed_fields($comment, $langcode) {
     $comment_alter_fields = comment_alter_get_alterable_fields($node->type);
     $diffs = diff_compare_entities($old_node, $new_node, $context);
     foreach ($diffs as $field_name => $diff) {
-      // Only compare fields marked as 'comment_alter',
+      // Only compare fields that belong to us.
       if (in_array($field_name, $comment_alter_fields)) {
         list ($old, $new) = diff_extract_state($diff, $context['states'][0]);
         if ($old != $new) {
@@ -353,7 +353,6 @@ function comment_alter_get_changed_fields($comment, $langcode) {
       }
     }
   }
-
   return $changed_fields;
 }
 
@@ -379,7 +378,11 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
 function comment_alter_theme() {
   $return = array();
   $return['comment_alter_diff'] = array(
-    'variables' => array('changed_fields' => array(), 'comment' => NULL, 'langcode' => NULL),
+    'variables' => array(
+      'changed_fields' => array(),
+      'comment' => NULL,
+      'langcode' => NULL,
+    ),
   );
   return $return;
 }
