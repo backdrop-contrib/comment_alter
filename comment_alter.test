@@ -267,3 +267,125 @@ class CommentAlterTextTestCase extends CommentAlterBaseTestCase {
   }
 }
 
+/**
+ * Functional tests for Comment Alter and File fields.
+ */
+class CommentAlterFileTestCase extends CommentAlterBaseTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => 'Comment Alter - File',
+      'description' => 'Ensure that Comment Alter is working with "File" fields',
+      'group' => 'Comment Alter',
+    );
+  }
+
+  public function setUp($modules = array()) {
+    parent::setUp(array(
+      'file',
+    ));
+  }
+
+  protected function getTestFile($type_name, $which = 0) {
+    $files = $this->drupalGetTestFiles($type_name, NULL);
+    $file = $files[$which];
+    $file->filesize = filesize($file->uri);
+    return $file;
+  }
+
+  public function testFileFieldSingle() {
+    $field_name = $this->createField('file', 'file_generic', array(
+      'cardinality' => 1,
+    ));
+
+    $file = $this->getTestFile('text');
+
+    $this->createNodeThenPostComment(
+      array(),
+      array("files[comment_alter_{$field_name}_und_0]" => drupal_realpath($file->uri))
+    );
+
+    $this->assertCommentDiff(array(
+      $field_name => array('', 'File: ' . basename($file->uri)),
+    ));
+  }
+
+  public function testFileFieldMultiple() {
+    $field_name = $this->createField('file', 'file_generic', array(
+      'cardinality' => -1,
+    ));
+
+    $file1 = file_save_data($this->randomName(), 'public://' . $this->randomName() . '.txt', FILE_EXISTS_RENAME);
+    $file1->display = TRUE;
+    $file2 = $this->getTestFile('text');
+
+    $this->createNodeThenPostComment(
+      array($field_name => array('und' => array(0 => (array)$file1))),
+      array("files[comment_alter_{$field_name}_und_1]" => drupal_realpath($file2->uri))
+    );
+
+    $this->assertCommentDiff(array(
+      $field_name => array(
+        'File: ' . basename($file1->uri),
+        'File: ' . basename($file1->uri) . ', File: ' . basename($file2->uri)),
+    ));
+  }
+}
+
+/**
+ * Functional tests for using the same field on both the node and comment.
+ */
+class CommentAlterDoubleFieldTestCase extends CommentAlterBaseTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => 'Comment Alter - Same field on node and comment',
+      'description' => 'Ensure that Comment Alter will work with the same field on both the node and comment.',
+      'group' => 'Comment Alter',
+    );
+  }
+
+  public function setUp($modules = array()) {
+    parent::setUp(array(
+      'text',
+    ));
+  }
+
+  public function testDoubleField() {
+    // Attach to the node with Comment Alter
+    $field_name = $this->createField('text', 'text_textfield', array(
+      'cardinality' => 1,
+    ));
+
+    // Now attach to the comment as well
+    field_create_instance(array(
+      'field_name' => $field_name,
+      'label' => "$field_name (comment)",
+      'entity_type' => 'comment',
+      'widget' => array('type' => 'text_textfield'),
+      'bundle' => 'comment_node_' . $this->content_type,
+      'settings' => array(),
+    ));
+
+    $old_value = $this->randomName();
+    $new_value = $this->randomName();
+    $this->assertNotEqual($old_value, $new_value);
+
+    $comment_value = $this->randomName();
+
+    $this->createNodeThenPostComment(
+      array($field_name => array('und' => array(0 => array('value' => $old_value)))),
+      array(
+        "comment_alter_{$field_name}[" . LANGUAGE_NONE . '][0][value]' => $new_value,
+        "{$field_name}[" . LANGUAGE_NONE . '][0][value]' => $comment_value,
+      )
+    );
+
+    $this->assertCommentDiff(array(
+      $field_name => array($old_value, $new_value),
+    ));
+
+    // Check that the comment value appeared and that the field label was different
+    $this->assertText("$field_name (comment)");
+    $this->assertText($comment_value);
+  }
+}
+
