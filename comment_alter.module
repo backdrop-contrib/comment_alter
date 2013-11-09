@@ -301,7 +301,7 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
       foreach ($form_state['values']['comment_alter']['fields'] as $field_name => $field_alias) {
         field_attach_submit('node', $node, $new_form, $new_form_state, array('field_name' => $field_name));
       }
-      // Special support for the Title field via the Title module
+      // Special support for the Title field via the Title module.
       if (module_exists('title') && isset($form_state['values']['comment_alter']['fields']['title_field'])) {
         title_entity_sync('node', $node, $node->language);
       }
@@ -350,8 +350,8 @@ function comment_alter_comment_load($comments) {
  *
  * @return array
  *   An associative array with keys being the changed field names and values
- *   being associative arrays with 3 keys:
- *   - name: field's name being changed.
+ *   being lists of associative arrays with 3 keys:
+ *   - name: field's name being changed (only for the first field value).
  *   - old: array of old field values.
  *   - new: array of new field values.
  *
@@ -437,7 +437,7 @@ function comment_alter_theme() {
  *
  * @param array $variables
  *   An associative array containing:
- *   - changed_fields: an array of changed fields, with these indexes:
+ *   - changed_fields: a list of arrays of changed fields, with these indexes:
  *     - name: field's name being changed.
  *     - old: array of old field values.
  *     - new: array of new field values.
