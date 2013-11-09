@@ -114,7 +114,6 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
       }
 
       // Grab the values and clear for NULL.
-      // @todo: Instead of ->div, we should serialize the whole things to HTML!
       $values = array($tr->td[1], $tr->td[3]);
       foreach ($values as $index => $value) {
         if ((string)$value == '&') {
