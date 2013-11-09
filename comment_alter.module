@@ -301,6 +301,10 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
       foreach ($form_state['values']['comment_alter']['fields'] as $field_name => $field_alias) {
         field_attach_submit('node', $node, $new_form, $new_form_state, array('field_name' => $field_name));
       }
+      // Special support for the Title field via the Title module
+      if (module_exists('title') && isset($form_state['values']['comment_alter']['fields']['title_field'])) {
+        title_entity_sync('node', $node, $node->language);
+      }
       // Creating a new node revision regardless the node type settings.
       $node->revision = TRUE;
       // Disable node updated notifications that caused by comment_alter.
@@ -368,6 +372,12 @@ function comment_alter_get_changed_fields($comment, $langcode) {
       'language' => $langcode,
     );
     $comment_alter_fields = comment_alter_get_alterable_fields($node->type);
+    // Because the 'title_field' is 'hidden' on all display modes, the Diff
+    // module will skip over it. However, the diff module has special support
+    // for the 'title' property, so we swap 'title_field' for 'title'.
+    if (($title_field_index = array_search('title_field', $comment_alter_fields)) !== FALSE) {
+      $comment_alter_fields[$title_field_index] = 'title';
+    }
     $diffs = diff_compare_entities($old_node, $new_node, $context);
     foreach ($diffs as $field_name => $diff) {
       // Only compare fields that belong to us.
