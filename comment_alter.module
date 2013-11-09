@@ -377,7 +377,7 @@ function comment_alter_get_changed_fields($comment, $langcode) {
           $rows = diff_get_rows($old, $new);
           $line = 0;
           foreach ($rows as $row) {
-            $changed_fields[$field_name . '-' . $line] = array(
+            $changed_fields[$field_name][] = array(
               'name' => $line ? '' : $diff['#name'],
               'old' => array(empty($row[1]['data']) ? '' : $row[1]['data']),
               'new' => array(empty($row[3]['data']) ? '' : $row[3]['data']),
@@ -439,12 +439,14 @@ function comment_alter_theme() {
 function theme_comment_alter_diff(&$variables) {
   $rows = array();
   foreach ($variables['changed_fields'] as $field) {
-    $rows[] = array(
-      empty($field['name']) ? '' : ($field['name'] . ':'),
-      implode(', ', $field['old']),
-      '&raquo;',
-      implode(', ', $field['new']),
-    );
+    foreach ($field as $value) {
+      $rows[] = array(
+        empty($value['name']) ? '' : ($value['name'] . ':'),
+        implode(', ', $value['old']),
+        '&raquo;',
+        implode(', ', $value['new']),
+      );
+    }
   }
   drupal_add_css(drupal_get_path('module', 'comment_alter') . '/comment_alter.css');
   return theme('table', array(
