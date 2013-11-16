@@ -381,7 +381,7 @@ function comment_alter_get_changed_fields($comment, $langcode) {
     $diffs = diff_compare_entities($old_node, $new_node, $context);
     foreach ($diffs as $field_name => $diff) {
       // Only compare fields that belong to us.
-      if (in_array($field_name, $comment_alter_fields)) {
+      if (field_access('view', $field_name, 'node') && in_array($field_name, $comment_alter_fields)) {
         list ($old, $new) = diff_extract_state($diff, $context['states'][0]);
         if ($old != $new) {
           $rows = diff_get_rows($old, $new);
