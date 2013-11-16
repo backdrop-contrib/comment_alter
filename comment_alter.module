@@ -407,7 +407,9 @@ function comment_alter_get_changed_fields($comment, $langcode) {
  * @see diff_diffs_show()
  */
 function comment_alter_comment_view($comment, $view_mode, $langcode) {
-  if (($view_mode == 'full') && isset($comment->comment_alter)) {
+  // Strip 'comment_node_' to get the node type machine name.
+  $type = substr($comment->node_type, 13);
+  if (($view_mode == 'full') && isset($comment->comment_alter) && user_access('view comment alterations in ' . $type)) {
     $comment->content['comment_alter'] = array(
       '#theme' => 'comment_alter_diff',
       '#changed_fields' => comment_alter_get_changed_fields($comment, $langcode),
@@ -509,6 +511,20 @@ function comment_alter_field_extra_fields() {
         'weight' => -1,
       );
     }
+  }
+  return $return;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function comment_alter_permission() {
+  $return = array();
+  foreach (node_type_get_types() as $type) {
+    $return['view comment alterations in ' . $type->type] = array(
+      // TODO: I18n support.
+      'title' => t('View comment alterations of %type nodes', array('%type' => $type->name)),
+    );
   }
   return $return;
 }
