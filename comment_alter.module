@@ -268,7 +268,7 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
           }
         }
       }
-      _comment_alter_cleanup($comment->{$field_alias});
+      _comment_alter_cleanup($values[$field_alias]);
       // Old values may have extra information in additional fields/columns
       // without having form elements. We need to get rid of this information
       // to be able to properly compare the new values (coming from the form)
