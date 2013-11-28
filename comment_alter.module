@@ -303,7 +303,14 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
       }
       // Special support for the Title field via the Title module.
       if (module_exists('title') && isset($form_state['values']['comment_alter']['fields']['title_field'])) {
-        title_entity_sync('node', $node, $node->language);
+        $fr_info = title_field_replacement_info('node');
+        if ($fr_info) {
+          foreach ($fr_info as $legacy_field => $info) {
+            if (title_field_replacement_enabled('node', $node->type, $legacy_field)) {
+              title_field_sync_get('node', $node, $legacy_field, $info, $node->language);
+            }
+          }
+        }
       }
       // Creating a new node revision regardless the node type settings.
       $node->revision = TRUE;
