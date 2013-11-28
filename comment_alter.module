@@ -236,8 +236,8 @@ function _comment_alter_validate_node_fields($form, &$form_state) {
 /**
  * Submit callback for the altered comment form.
  *
- * Determines which fields have actually changed, then called form_attach_submit()
- * on each of them, and saves the resulting node.
+ * Determines which fields have actually changed, then calls
+ * form_attach_submit() on each of them, and saves the resulting node.
  *
  * @see form_attach_submit()
  * @see comment_alter_form_comment_form_alter()
@@ -296,7 +296,7 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
     if (!empty($changed_fields)) {
       $node = $form_state['node'];
 
-      // Run field_attach_submit for all the changed fields
+      // Run field_attach_submit for all the changed fields.
       list ($new_form, $new_form_state) = _comment_alter_convert_form($form, $form_state);
       foreach ($form_state['values']['comment_alter']['fields'] as $field_name => $field_alias) {
         field_attach_submit('node', $node, $new_form, $new_form_state, array('field_name' => $field_name));
