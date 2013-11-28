@@ -29,6 +29,7 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
       'create ' . $this->content_type . ' content',
       'edit own ' . $this->content_type . ' content',
       'delete own ' . $this->content_type . ' content',
+      'view comment alterations in ' . $this->content_type,
     ));
     $this->drupalLogin($this->privileged_user);
   }
