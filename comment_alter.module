@@ -303,6 +303,13 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
       }
       // Special support for the Title field via the Title module.
       if (module_exists('title') && isset($form_state['values']['comment_alter']['fields']['title_field'])) {
+        // Calling this should be enough:
+        //   title_entity_sync('node', $node, $node->language);
+        // But it isn't. That function uses a static variable to make sure it
+        // is only run once per request, however, under certain conditions
+        // observed when using Panels, title_entity_sync() can be called several
+        // times before ever reaching this point. So, the following code was
+        // copied from title_entity_sync() to avoid the static variable.
         $fr_info = title_field_replacement_info('node');
         if ($fr_info) {
           foreach ($fr_info as $legacy_field => $info) {
