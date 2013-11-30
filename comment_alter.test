@@ -91,6 +91,57 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
   }
 
   /**
+   * Get a comment alteration diffs from the current page.
+   *
+   * @param (optional) int $ord
+   *   If there are multiple diff tables on the page, this specifies which one
+   *   in sequential order.
+   *
+   * @return array
+   *   An associative array keyed by field label pointing to an array which
+   *   contains arrays which have two values, the original and new value for
+   *   the given field.
+   */
+  protected function getCommentAlterations($ord = 0) {
+    // Extract the values from the '<table class="comment-alter-diff">...</table>'
+    $results = $this->xpath('//table[@class=:class]', array(':class' => 'comment-alter-diff'));
+    $result = count($results) >= $ord + 1 ? $results[$ord] : NULL;
+    $fields = array();
+    if (!empty($result)) {
+      $last_field_name = NULL;
+      foreach ($result->tbody->tr as $tr) {
+        // Figure out the field name.
+        $field_name = rtrim($tr->td[0], ':');
+        if (empty($field_name)) {
+          $field_name = $last_field_name;
+        }
+
+        // Grab the values and clear for NULL.
+        $values = array($tr->td[1], $tr->td[3]);
+        foreach ($values as $index => $value) {
+          if ((string)$value == '&') {
+            $values[$index] = NULL;
+          }
+          elseif ((string)$value->div->asXML() == '<div> </div>') {
+            // For file fields, it puts the original values as <div>&nbsp;</div>
+            // which becomes a crazy UTF-8 character when doing $value->asXML(),
+            // so we need special support here.
+            $values[$index] = NULL;
+          }
+          else {
+            $values[$index] = strip_tags($value->asXML());
+          }
+        }
+
+        // Add to the array and store the field_name process.
+        $fields[$field_name][] = $values;
+        $last_field_name = $field_name;
+      }
+    }
+    return $fields;
+  }
+
+  /**
    * Asserts that a Comment Alter diff table on the current page is as expected.
    *
    * @param array $test
@@ -102,39 +153,7 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
    *   in sequential order.
    */
   protected function assertCommentDiff($test, $ord = 0) {
-    // Extract the values from the '<table class="comment-alter-diff">...</table>'
-    $results = $this->xpath('//table[@class=:class]', array(':class' => 'comment-alter-diff'));
-    $result = $results[$ord];
-    $fields = array();
-    $last_field_name = NULL;
-    foreach ($result->tbody->tr as $tr) {
-      // Figure out the field name.
-      $field_name = rtrim($tr->td[0], ':');
-      if (empty($field_name)) {
-        $field_name = $last_field_name;
-      }
-
-      // Grab the values and clear for NULL.
-      $values = array($tr->td[1], $tr->td[3]);
-      foreach ($values as $index => $value) {
-        if ((string)$value == '&') {
-          $values[$index] = NULL;
-        }
-        elseif ((string)$value->div->asXML() == '<div> </div>') {
-          // For file fields, it puts the original values as <div>&nbsp;</div>
-          // which becomes a crazy UTF-8 character when doing $value->asXML(),
-          // so we need special support here.
-          $values[$index] = NULL;
-        }
-        else {
-          $values[$index] = strip_tags($value->asXML());
-        }
-      }
-
-      // Add to the array and store the field_name process.
-      $fields[$field_name][] = $values;
-      $last_field_name = $field_name;
-    }
+    $fields = $this->getCommentAlterations($ord);
 
     // Compare the values passed in against what's on the page
     foreach ($test as $field_name => $values) {
@@ -438,3 +457,62 @@ class CommentAlterDoubleFieldTestCase extends CommentAlterBaseTestCase {
   }
 }
 
+/**
+ * Functional tests for permissions.
+ */
+class CommentAlterPermissionTestCase extends CommentAlterBaseTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => 'Comment Alter - Permissions',
+      'description' => 'Ensure that Comment Alter is correctly following user permissions.',
+      'group' => 'Comment Alter',
+    );
+  }
+
+  public function setUp($modules = array()) {
+    parent::setUp(array(
+      'list',
+      'options',
+    ));
+  }
+
+  /**
+   * This function was copied from ComentAlterListTextTestCase::testOptionsSelectSingle(),
+   * which should pass for a priveledged user, but fail for an unpriveledged one.
+   */
+  public function testViewCommentAlterations() {
+    // START ComentAlterListTextTestCase::testOptionsSelectSingle().
+    $field_name = $this->createField('list_text', 'options_select', array(
+      'settings' => array(
+        'allowed_values' => array(1 => 'One', 2 => 'Two', 3 => 'Three')
+      ),
+      'cardinality' => 1,
+    ));
+
+    $this->createNodeThenPostComment(
+      array($field_name => array(LANGUAGE_NONE => array(0 => array('value' => 1)))),
+      array("comment_alter_{$field_name}[" . LANGUAGE_NONE . ']' => '2')
+    );
+
+    $this->assertCommentDiff(array(
+      $field_name => array(
+        array('One', 'Two')
+      ),
+    ));
+    // END ComentAlterListTextTestCase::testOptionsSelectSingle().
+
+    // Get the current URL so we can return here.
+    $url = $this->getUrl();
+
+    // Switch to an unprivileged user.
+    $unprivileged_user = $this->drupalCreateUser(array(
+      'access content',
+    ));
+    $this->drupalLogin($unprivileged_user);
+
+    // Return to the URL and assert that there are no comment alterations on it.
+    $this->drupalGet($url);
+    $alterations = $this->getCommentAlterations();
+    $this->assertTrue(empty($alterations));
+  }
+}
