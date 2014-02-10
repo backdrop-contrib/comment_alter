@@ -21,6 +21,10 @@ function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state,
     return;
   }
   if ($form['instance']['entity_type']['#value'] == 'node') {
+    $bundle_name = $form['instance']['bundle']['#value'];
+    $field_name = $form['instance']['field_name']['#value'];
+    $comment_fields = field_info_instances('comment', 'comment_node_' . $bundle_name);
+
     // Additional custom field values will be automatically stored in the
     // database, so custom save mechanism is not necessary.
     $form['instance']['comment_alter'] = array(
@@ -29,6 +33,13 @@ function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state,
       '#weight' => $form['instance']['required']['#weight'] + 0.5,
       '#default_value' => !empty($form['#instance']['comment_alter']),
     );
+
+    // Make sure the field isn't already on the Comment entity.
+    if (!empty($comment_fields[$field_name])) {
+      $form['instance']['comment_alter']['#default_value'] = FALSE;
+      $form['instance']['comment_alter']['#disabled'] = TRUE;
+      $form['instance']['comment_alter']['#description'] = '<span class="error">' . t('This field also exists on the comment. You must remove it from the comment in order to enabled altering this field from comments.') . '</span>';
+    }
   }
 }
 
@@ -52,6 +63,62 @@ function comment_alter_get_alterable_fields($content_type) {
     }
   }
   return $comment_alter_fields[$content_type];
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Don't allow users to add existing fields if they are alterable from comment on the
+ * parent node bundle.
+ */
+function comment_alter_form_field_ui_field_overview_form_alter(&$form, &$form_state) {
+  if ($form['#entity_type'] == 'comment') {
+    // remove 'comment_node_' from the beginning of the bundle name to get the node bundle name
+    $node_bundle_name = substr($form['#bundle'], 13);
+    $comment_alter_fields = comment_alter_get_alterable_fields($node_bundle_name);
+
+    if (!empty($comment_alter_fields)) {
+      $field_options =& $form['fields']['_add_existing_field']['field_name']['#options'];
+      foreach ($field_options as $field_name => $field_label) {
+        if (in_array($field_name, $comment_alter_fields)) {
+          // remove fields that are alterable from comment on the parent node
+          unset($field_options[$field_name]);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_requirements().
+ *
+ * If somehow a field is added to a comment bundle which is also alterable from comment on the
+ * parent node bundle, put a message on the system status report.
+ *
+ * We've made it impossible to do this via the UI, but it's still possible via low-level
+ * trickery, so this is a fallback to alert site administrators of a problem.
+ */
+function comment_alter_requirements($phase) {
+  $requirements = array();
+  if ($phase == 'runtime') {
+    foreach (node_type_get_types() as $bundle_name => $type_obj) {
+      $comment_alter_fields = comment_alter_get_alterable_fields($bundle_name);
+      if (!empty($comment_alter_fields)) {
+        $comment_fields = field_info_instances('comment', 'comment_node_' . $bundle_name);
+        foreach ($comment_fields as $field_name => $field_instance) {
+          if (in_array($field_name, $comment_alter_fields)) {
+            $requirements[] = array(
+              'title' => t('Comment alter'),
+              'value' => t('Invalid fields error'),
+              'description' => t('The %field_name field exists on the comment and is alterable from comment on the parent node. Please remove it from the comment or disable alter from comment!', array('%field_name' => $field_name)),
+              'severity' => REQUIREMENT_ERROR,
+            );
+          }
+        }
+      }
+    }
+  }
+  return $requirements;
 }
 
 /**
