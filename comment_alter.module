@@ -55,9 +55,10 @@ function comment_alter_get_alterable_fields($content_type) {
   $comment_alter_fields = &drupal_static(__FUNCTION__);
   if (!isset($comment_alter_fields[$content_type])) {
     $field_infos = field_info_instances('node', $content_type);
+    $comment_fields = field_info_instances('comment', 'comment_node_' . $content_type);
     $comment_alter_fields[$content_type] = array();
     foreach ($field_infos as $field_name => $value) {
-      if (!empty($value['comment_alter'])) {
+      if (!empty($value['comment_alter']) && empty($comment_fields[$field_name])) {
         $comment_alter_fields[$content_type][] = $field_name;
       }
     }
@@ -102,7 +103,17 @@ function comment_alter_requirements($phase) {
   $requirements = array();
   if ($phase == 'runtime') {
     foreach (node_type_get_types() as $bundle_name => $type_obj) {
-      $comment_alter_fields = comment_alter_get_alterable_fields($bundle_name);
+      // Get the comment alter fields directly, rather than via
+      // comment_alter_get_alterable_fields(), because it will remove the
+      // fields which are on the comment.
+      $field_infos = field_info_instances('node', $bundle_name);
+      $comment_alter_fields = array();
+      foreach ($field_infos as $field_name => $value) {
+        if (!empty($value['comment_alter'])) {
+          $comment_alter_fields[] = $field_name;
+        }
+      }
+
       if (!empty($comment_alter_fields)) {
         $comment_fields = field_info_instances('comment', 'comment_node_' . $bundle_name);
         foreach ($comment_fields as $field_name => $field_instance) {
