@@ -154,9 +154,14 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
     // values) are the columns which do have their form elements.
     $alterable_columns = array();
     foreach ($comment_alter_fields as $field_name) {
-      // Attach the node field to the comment form.
-      field_attach_form('node', $node, $form, $form_state, $node->language, array('field_name' => $field_name));
-      if (!empty($form[$field_name]) && $form[$field_name]['#access']) {
+      // Attach the node field to the comment form. We do it on a copy of the
+      // $form, so that we know we are only getting the field element itself
+      // and no other side-effects (for example, the field_groups from the node
+      // entity).
+      $node_form = $form;
+      field_attach_form('node', $node, $node_form, $form_state, $node->language, array('field_name' => $field_name));
+      if (!empty($node_form[$field_name])) {
+        $form[$field_name] = $node_form[$field_name];
         $field_language = $form[$field_name]['#language'];
         $field_value = array();
         // Not sure that there is a language key in the field if the field value
