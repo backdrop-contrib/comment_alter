@@ -312,9 +312,6 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
   if (isset($values['comment_alter'])) {
     $changed_fields = array();
     foreach ($values['comment_alter']['fields'] as $field_name) {
-      // Multiple-value fields should not have an 'add_more' delta (this comes
-      // from the Field API's Form API stuff: 'add_more' delta is the 'Add more'
-      // button.
       _comment_alter_cleanup_field_values($values, $field_name);
       _comment_alter_cleanup_field_values($values, $field_name . '_old');
       // If field values have changed, add it to the list.
@@ -352,11 +349,20 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
       $node->revision = TRUE;
       // Disable node updated notifications that caused by comment_alter. New
       // comment notifications should be enough - this happens when submitting a
-      // comment, not when editing a node, after all.
-      if (module_exists('notifications_content')) {
-        $node->notifications_content_disable = TRUE;
-      }
+      // comment, not when editing a node, after all. This disabling is
+      // unconditional: there may be other modules than notifications_content
+      // that wants these notifications be disabled; reusing the same key seems
+      // to be a non-issue here as it won't get stored anywhere.
+      $node->notifications_content_disable = TRUE;
       node_save($node);
+      // Fire the comment_alter_node_postsave hook with the $node and $comment
+      // objects; though $node does not have a $node->original property, all the
+      // affected fields' information (both previous and current values) are
+      // available in the comment object.
+      foreach (module_implements('comment_alter_node_postsave') as $module) {
+        $function = $module . '_comment_alter_node_postsave';
+        $function($node, $form_state['comment']);
+      }
       $comment_alter = array(
         'old_vid' => $values['comment_alter']['old_vid'],
         'new_vid' => $node->vid,
