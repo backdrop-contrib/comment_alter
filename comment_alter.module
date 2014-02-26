@@ -238,22 +238,26 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
  * the old and new field values and find changes.
  *
  * @param array $a
- *   Array whose empty elements should be removed.
+ *   Array whose elements should be cleaned up.
+ * @param string $field_name
+ *   Clean up this field of the array.
+ * @param string $old = ''
+ *   Suffix for old value cleanup.
  */
-function _comment_alter_cleanup_field_values(&$values, $field_name) {
+function _comment_alter_cleanup_field_values(&$values, $field_name, $old = '') {
   // Multiple-value fields should not have an 'add_more' delta (this comes from
   // the Field API's Form API stuff: 'add_more' delta is the 'Add more' button.
-  foreach ($values[$field_name] as $language => $deltas) {
-    foreach ($values[$field_name][$language] as $delta => $columns) {
+  foreach ($values[$field_name . $old] as $language => $deltas) {
+    foreach ($values[$field_name . $old][$language] as $delta => $columns) {
       if ($delta === 'add_more') {
-        unset($values[$field_name][$language][$delta]);
+        unset($values[$field_name . $old][$language][$delta]);
         continue;
       }
       // Non-alterable columns (eg. _weight) should be removed (from
       // comparison).
-      foreach ($values[$field_name][$language][$delta] as $column => $value) {
+      foreach ($values[$field_name . $old][$language][$delta] as $column => $value) {
         if (!isset($values['comment_alter']['alterable_columns'][$field_name][$column])) {
-          unset($values[$field_name][$language][$delta][$column]);
+          unset($values[$field_name . $old][$language][$delta][$column]);
         }
       }
     }
@@ -313,7 +317,7 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
     $changed_fields = array();
     foreach ($values['comment_alter']['fields'] as $field_name) {
       _comment_alter_cleanup_field_values($values, $field_name);
-      _comment_alter_cleanup_field_values($values, $field_name . '_old');
+      _comment_alter_cleanup_field_values($values, $field_name, '_old');
       // If field values have changed, add it to the list.
       if ($values[$field_name . '_old'] != $values[$field_name]) {
         $changed_fields[$field_name] = $field_name;
