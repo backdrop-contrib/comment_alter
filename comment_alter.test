@@ -8,8 +8,8 @@
 /**
  * Parent of all the test cases for Comment Alter.
  *
- * Provides reusable set and assert methods for the children class. Each child class is roughly
- * for a different type of field.
+ * Provides reusable set and assert methods for the children classes. Each child
+ * class is roughly for a different type of field.
  */
 class CommentAlterBaseTestCase extends DrupalWebTestCase {
   public function setUp($modules = array()) {
@@ -58,8 +58,8 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
    */
   protected function createField($field_type, $widget_type, $field_settings = array(), $instance_settings = array(), $comment_alter = TRUE) {
     $field_name = drupal_strtolower($this->randomName() . '_field_name');
-    $field = field_create_field(array('field_name' => $field_name, 'type' => $field_type) + $field_settings);
-    $instance = field_create_instance(array(
+    field_create_field(array('field_name' => $field_name, 'type' => $field_type) + $field_settings);
+    field_create_instance(array(
       'field_name' => $field_name,
       'entity_type' => 'node',
       'widget' => array('type' => $widget_type),
@@ -87,7 +87,7 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
     $node = $this->drupalCreateNode(array(
       'type' => $this->content_type,
     ) + $original_properties);
-    $text = $this->drupalGet("node/{$node->nid}");
+    $this->drupalGet("node/{$node->nid}");
     $edit = array();
     $edit['comment_body[' . LANGUAGE_NONE . '][0][value]'] = $this->randomName();
     $edit = array_merge($edit, $comment_edit);
@@ -103,11 +103,12 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
    *
    * @return array
    *   An associative array keyed by field label pointing to an array which
-   *   contains arrays which have two values, the original and new value for
-   *   the given field.
+   *   contains arrays which have two values, the original and new value for the
+   *   given field.
    */
   protected function getCommentAlterations($ord = 0) {
-    // Extract the values from the '<table class="comment-alter-diff">...</table>'
+    // Extract the values from the
+    // '<table class="comment-alter-diff">...</table>'.
     $results = $this->xpath('//table[@class=:class]', array(':class' => 'comment-alter-diff'));
     $result = count($results) >= $ord + 1 ? $results[$ord] : NULL;
     $fields = array();
@@ -159,7 +160,7 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
   protected function assertCommentDiff($test, $ord = 0) {
     $fields = $this->getCommentAlterations($ord);
 
-    // Compare the values passed in against what's on the page
+    // Compare the values passed in against what's on the page.
     foreach ($test as $field_name => $values) {
       $this->assertTrue(isset($fields[$field_name]), "No field called '$field_name' found in comment alter diff #$ord");
       foreach ($values as $index => $value) {
@@ -230,7 +231,7 @@ class CommentAlterAdminTestCase extends CommentAlterBaseTestCase {
   }
 
   public function testCommentManageFields() {
-    // Attach to the node with Comment Alter
+    // Attach to the node with Comment Alter.
     $field_name = $this->createField('text', 'text_textfield', array(
       'cardinality' => 1,
     ));
@@ -239,7 +240,7 @@ class CommentAlterAdminTestCase extends CommentAlterBaseTestCase {
     $manage_fields_path = "admin/structure/types/manage/{$type_name}/comment/fields";
 
     // So, if we go to the Comment bundles 'Manage Fields' page, we shouldn't
-    // se the the field as an option to add.
+    // see the the field as an option to add.
     $this->drupalGet($manage_fields_path);
     $this->assertFalse($this->hasExistingFieldOption($field_name));
 
@@ -252,7 +253,7 @@ class CommentAlterAdminTestCase extends CommentAlterBaseTestCase {
   }
 
   public function testNodeFieldInstanceSettings() {
-    // Attach to the node (but without Comment Alter)
+    // Attach to the node (but without Comment Alter).
     $field_name = $this->createField('text', 'text_textfield', array(
       'cardinality' => 1,
     ), array(), FALSE);
@@ -277,11 +278,11 @@ class CommentAlterAdminTestCase extends CommentAlterBaseTestCase {
     $alterable_fields = comment_alter_get_alterable_fields($this->content_type);
     $this->assertEqual($alterable_fields, array($field_name));
 
-    // Enable this field for to comment and ensure that the message is
-    // set complaining about this.
+    // Enable this field for to comment and ensure that the message is set
+    // complaining about this.
     $this->attachFieldToComment($field_name);
     $this->drupalGet($manage_field_path);
-    $this->assertText(t('This field also exists on the comment. You must remove it from the comment in order to enabled altering this field from comments.'));
+    $this->assertText(t('This field also exists on the comment. You must remove it from the comment in order to enable altering this field from comments.'));
 
     // Check our API to see that it's disabled now.
     drupal_static_reset('comment_alter_get_alterable_fields');
@@ -290,17 +291,17 @@ class CommentAlterAdminTestCase extends CommentAlterBaseTestCase {
   }
 
   public function testStatusReport() {
-    // Attach to the node with Comment Alter
+    // Attach to the node with Comment Alter.
     $field_name = $this->createField('text', 'text_textfield', array(
       'cardinality' => 1,
     ));
 
-    // Now attach to the comment as well
+    // Now attach to the comment as well.
     $this->attachFieldToComment($field_name);
 
     // Make sure the correct message is on the status report.
-    $text = $this->drupalGet("admin/reports/status");
-    $this->assertRaw(t('The %field_name field exists on the comment and is alterable from comment on the parent node. Please remove it from the comment or disable alter from comment!', array('%field_name' => $field_name)));
+    $this->drupalGet('admin/reports/status');
+    $this->assertRaw(t('The %field_name field exists on the comment and is alterable from comment on the parent node. Please remove it from the comment or disable altering it from comment!', array('%field_name' => $field_name)));
   }
 }
 
@@ -555,11 +556,12 @@ class CommentAlterPermissionTestCase extends CommentAlterBaseTestCase {
   }
 
   /**
-   * This function was copied from ComentAlterListTextTestCase::testOptionsSelectSingle(),
-   * which should pass for a priveledged user, but fail for an unpriveledged one.
+   * This function was copied from
+   * CommentAlterListTextTestCase::testOptionsSelectSingle(), which should pass
+   * for a privileged user, but fail for an unprivileged one.
    */
   public function testViewCommentAlterations() {
-    // START ComentAlterListTextTestCase::testOptionsSelectSingle().
+    // START CommentAlterListTextTestCase::testOptionsSelectSingle().
     $field_name = $this->createField('list_text', 'options_select', array(
       'settings' => array(
         'allowed_values' => array(1 => 'One', 2 => 'Two', 3 => 'Three')
@@ -577,7 +579,7 @@ class CommentAlterPermissionTestCase extends CommentAlterBaseTestCase {
         array('One', 'Two')
       ),
     ));
-    // END ComentAlterListTextTestCase::testOptionsSelectSingle().
+    // END CommentAlterListTextTestCase::testOptionsSelectSingle().
 
     // Get the current URL so we can return here.
     $url = $this->getUrl();

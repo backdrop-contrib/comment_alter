@@ -14,7 +14,7 @@
  * @see comment_alter_form_field_ui_field_edit_form_alter_submit()
  */
 function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
-  // Image fields and file fields are not supported by now, peroid.
+  // Image fields fields are not supported by now, peroid.
   // Field collection not currently supported by Diff module.
   // @see http://drupal.org/node/1897196
   if ($form['#field']['type'] == 'image' || $form['#field']['type'] == 'field_collection') {
@@ -38,7 +38,7 @@ function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state,
     if (!empty($comment_fields[$field_name])) {
       $form['instance']['comment_alter']['#default_value'] = FALSE;
       $form['instance']['comment_alter']['#disabled'] = TRUE;
-      $form['instance']['comment_alter']['#description'] = '<span class="error">' . t('This field also exists on the comment. You must remove it from the comment in order to enabled altering this field from comments.') . '</span>';
+      $form['instance']['comment_alter']['#description'] = '<span class="error">' . t('This field also exists on the comment. You must remove it from the comment in order to enable altering this field from comments.') . '</span>';
     }
   }
 }
@@ -69,12 +69,13 @@ function comment_alter_get_alterable_fields($content_type) {
 /**
  * Implements hook_form_FORM_ID_alter().
  *
- * Don't allow users to add existing fields if they are alterable from comment on the
- * parent node bundle.
+ * Don't allow users to add existing fields if they are alterable from comment
+ * on the parent node bundle.
  */
 function comment_alter_form_field_ui_field_overview_form_alter(&$form, &$form_state) {
   if ($form['#entity_type'] == 'comment') {
-    // remove 'comment_node_' from the beginning of the bundle name to get the node bundle name
+    // Remove 'comment_node_' from the beginning of the bundle name to get the
+    // node bundle name.
     $node_bundle_name = substr($form['#bundle'], 13);
     $comment_alter_fields = comment_alter_get_alterable_fields($node_bundle_name);
 
@@ -82,7 +83,7 @@ function comment_alter_form_field_ui_field_overview_form_alter(&$form, &$form_st
       $field_options =& $form['fields']['_add_existing_field']['field_name']['#options'];
       foreach ($field_options as $field_name => $field_label) {
         if (in_array($field_name, $comment_alter_fields)) {
-          // remove fields that are alterable from comment on the parent node
+          // Remove fields that are alterable from comment on the parent node.
           unset($field_options[$field_name]);
         }
       }
@@ -93,19 +94,20 @@ function comment_alter_form_field_ui_field_overview_form_alter(&$form, &$form_st
 /**
  * Implements hook_requirements().
  *
- * If somehow a field is added to a comment bundle which is also alterable from comment on the
- * parent node bundle, put a message on the system status report.
+ * If somehow a field is added to a comment bundle which is also alterable from
+ * comment on the parent node bundle, put a message on the system status report.
  *
- * We've made it impossible to do this via the UI, but it's still possible via low-level
- * trickery, so this is a fallback to alert site administrators of a problem.
+ * We've made it impossible to do this via the UI, but it's still possible via
+ * low-level trickery, so this is a fallback to alert site administrators of a
+ * problem.
  */
 function comment_alter_requirements($phase) {
   $requirements = array();
   if ($phase == 'runtime') {
     foreach (node_type_get_types() as $bundle_name => $type_obj) {
       // Get the comment alter fields directly, rather than via
-      // comment_alter_get_alterable_fields(), because it will remove the
-      // fields which are on the comment.
+      // comment_alter_get_alterable_fields(), because it will remove the fields
+      // which are on the comment.
       $field_infos = field_info_instances('node', $bundle_name);
       $comment_alter_fields = array();
       foreach ($field_infos as $field_name => $value) {
@@ -121,7 +123,7 @@ function comment_alter_requirements($phase) {
             $requirements[] = array(
               'title' => t('Comment alter'),
               'value' => t('Invalid fields error'),
-              'description' => t('The %field_name field exists on the comment and is alterable from comment on the parent node. Please remove it from the comment or disable alter from comment!', array('%field_name' => $field_name)),
+              'description' => t('The %field_name field exists on the comment and is alterable from comment on the parent node. Please remove it from the comment or disable altering it from comment!', array('%field_name' => $field_name)),
               'severity' => REQUIREMENT_ERROR,
             );
           }
@@ -140,23 +142,23 @@ function comment_alter_requirements($phase) {
 function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
   $node = $form['#node'];
   $comment_alter_fields = comment_alter_get_alterable_fields($node->type);
-  // Add widgets to comment form if comment form is new,
-  // and if comment alter fields are available.
+  // Add widgets to comment form if comment form is new, and if comment alter
+  // fields are available.
   if (empty($form['cid']['#value']) && !empty($comment_alter_fields)) {
-    // Every comment alter field goes to the root of the comment form so
-    // this enables that other modules can re-order or group the fields.
+    // Every comment alter field goes to the root of the comment form so this
+    // enables that other modules can re-order or group the fields.
     $field_infos = field_info_extra_fields('comment', 'comment_node_' . $node->type, 'form');
     // The _comment_alter_submit_node_fields() function needs these two arrays.
     // This one is a list of comment_alterable field.
     $alterable_fields = array();
     // This one informs about comment_alterable columns per comment_alterable
-    // fields. First-level key is the field name, second-level keys (and
-    // values) are the columns which do have their form elements.
+    // fields. First-level key is the field name, second-level keys (and values)
+    // are the columns which do have their form elements.
     $alterable_columns = array();
     foreach ($comment_alter_fields as $field_name) {
       // Attach the node field to the comment form. We do it on a copy of the
-      // $form, so that we know we are only getting the field element itself
-      // and no other side-effects (for example, the field_groups from the node
+      // $form, so that we know we are only getting the field element itself and
+      // no other side-effects (for example, the field_groups from the node
       // entity).
       $node_form = $form;
       field_attach_form('node', $node, $node_form, $form_state, $node->language, array('field_name' => $field_name));
@@ -170,14 +172,14 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
           $field_value[$field_language] = $node->{$field_name}[$field_language];
         }
         // Comment_alterable node fields must be amongst the comment fields
-        // themselves in order to be able to properly weight/reorderd them, put
+        // themselves in order to be able to properly weight/reorder them, put
         // them into a field_group, etc. on the manage comment fields form.
         $form[$field_name . '_old'] = array(
           '#type' => 'value',
           '#value' => $field_value,
         );
-        // TODO: This doesn't seem to be working properly: if the extra field
-        // is set to last, it even gets displayed above comment subject.
+        // TODO: This doesn't seem to be working properly: if the extra field is
+        // set to last, it even gets displayed above comment subject.
         $form[$field_name]['#weight'] = $field_infos[$field_name]['weight'];
 
         // Remember that this field is alterable.
@@ -208,7 +210,8 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
       }
     }
     if (!empty($alterable_fields)) {
-      // Push down the information gathered to _comment_alter_submit_node_fields()
+      // Push down the information gathered so far to
+      // _comment_alter_submit_node_fields().
       $form['comment_alter'] = array(
         '#type' => 'value',
         '#value' => array(
@@ -220,8 +223,8 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
       // Put the node entity in $form_state so can get it in submit/validate
       // without loading it again.
       $form_state['node'] = $node;
-      // Add submit/validate function so we can call field_attach_form_validate()
-      // and field_attach_submit().
+      // Add submit/validate function so we can call
+      // field_attach_form_validate() and field_attach_submit().
       $form['#validate'][] = '_comment_alter_validate_node_fields';
       $form['#submit'][] = '_comment_alter_submit_node_fields';
     }
@@ -231,16 +234,15 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
 /**
  * Helper function to clean up field values for comparison.
  *
- * Removes 'add_more' and non-alterable columns (like _weight) so we can
- * compare the old and new field values and find changes.
+ * Removes 'add_more' and non-alterable columns (like _weight) so we can compare
+ * the old and new field values and find changes.
  *
  * @param array $a
  *   Array whose empty elements should be removed.
  */
 function _comment_alter_cleanup_field_values(&$values, $field_name) {
-  // Multiple-value fields should not have an 'add_more' delta (this comes
-  // from the Field API's Form API stuff: 'add_more' delta is the 'Add more'
-  // button.
+  // Multiple-value fields should not have an 'add_more' delta (this comes from
+  // the Field API's Form API stuff: 'add_more' delta is the 'Add more' button.
   foreach ($values[$field_name] as $language => $deltas) {
     foreach ($values[$field_name][$language] as $delta => $columns) {
       if ($delta === 'add_more') {
@@ -332,11 +334,11 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
       if (module_exists('title') && isset($form_state['values']['comment_alter']['fields']['title_field'])) {
         // Calling this should be enough:
         //   title_entity_sync('node', $node, $node->language);
-        // But it isn't. That function uses a static variable to make sure it
-        // is only run once per request, however, under certain conditions
-        // observed when using Panels, title_entity_sync() can be called several
-        // times before ever reaching this point. So, the following code was
-        // copied from title_entity_sync() to avoid the static variable.
+        // But it isn't. That function uses a static variable to make sure it is
+        // only run once per request, however, under certain conditions observed
+        // when using Panels, title_entity_sync() can be called several times
+        // before ever reaching this point. So, the following code was copied
+        // from title_entity_sync() to avoid the static variable.
         $fr_info = title_field_replacement_info('node');
         if ($fr_info) {
           foreach ($fr_info as $legacy_field => $info) {
@@ -348,9 +350,9 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
       }
       // Creating a new node revision regardless the node type settings.
       $node->revision = TRUE;
-      // Disable node updated notifications that caused by comment_alter.
-      // New comment notifications should be enough - this happens when
-      // submitting a comment, not when editing a node, after all.
+      // Disable node updated notifications that caused by comment_alter. New
+      // comment notifications should be enough - this happens when submitting a
+      // comment, not when editing a node, after all.
       if (module_exists('notifications_content')) {
         $node->notifications_content_disable = TRUE;
       }
@@ -537,7 +539,7 @@ function comment_alter_field_extra_fields() {
     foreach ($comment_alter_fields as $field_name) {
       $field = field_info_instance('node', $field_name, $type->type);
       // Comment_alterable node fields must be amongst the comment fields
-      // themselves in order to be able to properly weight/reorderd them, put
+      // themselves in order to be able to properly weight/reorder them, put
       // them into a field_group, etc. on the manage comment fields form.
       $return['comment']['comment_node_' . $type->type]['form'][$field_name] = array(
         'label' => $field['label'],
