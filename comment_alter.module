@@ -237,7 +237,7 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
  * Removes 'add_more' and non-alterable columns (like _weight) so we can compare
  * the old and new field values and find changes.
  *
- * @param array $a
+ * @param array $values
  *   Array whose elements should be cleaned up.
  * @param string $field_name
  *   Clean up this field of the array.
@@ -363,10 +363,8 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
       // objects; though $node does not have a $node->original property, all the
       // affected fields' information (both previous and current values) are
       // available in the comment object.
-      foreach (module_implements('comment_alter_node_postsave') as $module) {
-        $function = $module . '_comment_alter_node_postsave';
-        $function($node, $form_state['comment']);
-      }
+      $node->original = node_load($node->nid, $values['comment_alter']['old_vid']);
+      module_invoke_all('comment_alter_node_postsave', $node, $form_state['comment']);
       $comment_alter = array(
         'old_vid' => $values['comment_alter']['old_vid'],
         'new_vid' => $node->vid,
@@ -581,4 +579,31 @@ function comment_alter_permission() {
     );
   }
   return $return;
+}
+
+/**
+ * Implements hook_node_presave().
+ */
+function comment_alter_node_presave($node) {
+  if (!isset($node->notifications_content_disable) && module_exists('rules')) {
+    rules_invoke_event('comment_alter_node_presave', $node);
+  }
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function comment_alter_node_update($node) {
+  if (!isset($node->notifications_content_disable) && module_exists('rules')) {
+    rules_invoke_event('comment_alter_node_update', $node);
+  }
+}
+
+/**
+ * Implements hook_comment_alter_node_postsave().
+ */
+function comment_alter_comment_alter_node_postsave($node, $comment) {
+  if (module_exists('rules')) {
+    rules_invoke_event('comment_alter_node_postsave', $node, $comment);
+  }
 }
