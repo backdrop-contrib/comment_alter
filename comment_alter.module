@@ -411,7 +411,7 @@ function comment_alter_comment_load($comments) {
 function comment_alter_get_changed_fields($comment, $langcode) {
   $changed_fields = array();
 
-  if (isset($comment->comment_alter)) {
+  if (isset($comment->comment_alter) && isset($comment->comment_alter['new_vid'])) {
     $node = node_load($comment->nid);
     module_load_include('inc', 'diff', 'diff.pages');
     $old_node = node_load($comment->nid, $comment->comment_alter['old_vid']);
