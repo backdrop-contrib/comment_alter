@@ -444,24 +444,24 @@ function comment_alter_get_changed_fields($comment, $langcode) {
       $field = field_info_field($field_name);
       if (field_access('view', $field, 'node') && in_array($field_name, $comment_alter_fields)) {
         $instance = field_info_instance('node', $field_name, $node->type);
-        if (!empty($instance['comment_alter_hide'])) {
-          if (diff_node_revision_access($node)) {
-            $changed_fields[$field_name][] = array(
-              'name' => $diff['#name'],
-              'changes' => l(t('View changes'), 'node/' . $node->nid . '/revisions/view/' . $old_node->vid . '/' . $new_node->vid),
-            );
-          }
-          else {
-            $changed_fields[$field_name][] = array(
-              'name' => $diff['#name'],
-              'old' => array('&hellip;'),
-              'new' => array('&hellip;'),
-            );
-          }
-          continue;
-        }
         list ($old, $new) = diff_extract_state($diff, $context['states'][0]);
         if ($old != $new) {
+          if (!empty($instance['comment_alter_hide'])) {
+            if (diff_node_revision_access($node)) {
+              $changed_fields[$field_name][] = array(
+                'name' => $diff['#name'],
+                'changes' => l(t('View changes'), 'node/' . $node->nid . '/revisions/view/' . $old_node->vid . '/' . $new_node->vid),
+              );
+            }
+            else {
+              $changed_fields[$field_name][] = array(
+                'name' => $diff['#name'],
+                'old' => array('&hellip;'),
+                'new' => array('&hellip;'),
+              );
+            }
+            continue;
+          }
           $rows = diff_get_rows($old, $new);
           $line = 0;
           foreach ($rows as $row) {
