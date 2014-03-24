@@ -33,6 +33,15 @@ function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state,
       '#weight' => $form['instance']['required']['#weight'] + 0.5,
       '#default_value' => !empty($form['#instance']['comment_alter']),
     );
+    $form['instance']['comment_alter_hide'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Hide alterations of this field from diffs.'),
+      '#weight' => $form['instance']['required']['#weight'] + 0.7,
+      '#default_value' => !empty($form['#instance']['comment_alter_hide']),
+      '#states' => array(
+        'invisible' => array(':input[name="instance[comment_alter]"]' => array('checked' => FALSE)),
+      ),
+    );
 
     // Make sure the field isn't already on the Comment entity.
     if (!empty($comment_fields[$field_name])) {
@@ -434,6 +443,23 @@ function comment_alter_get_changed_fields($comment, $langcode) {
       // Only compare fields that belong to us.
       $field = field_info_field($field_name);
       if (field_access('view', $field, 'node') && in_array($field_name, $comment_alter_fields)) {
+        $instance = field_info_instance('node', $field_name, $node->type);
+        if (!empty($instance['comment_alter_hide'])) {
+          if (diff_node_revision_access($node)) {
+            $changed_fields[$field_name][] = array(
+              'name' => $diff['#name'],
+              'changes' => l(t('View changes'), 'node/' . $node->nid . '/revisions/view/' . $old_node->vid . '/' . $new_node->vid),
+            );
+          }
+          else {
+            $changed_fields[$field_name][] = array(
+              'name' => $diff['#name'],
+              'old' => array('&hellip;'),
+              'new' => array('&hellip;'),
+            );
+          }
+          continue;
+        }
         list ($old, $new) = diff_extract_state($diff, $context['states'][0]);
         if ($old != $new) {
           $rows = diff_get_rows($old, $new);
@@ -504,12 +530,21 @@ function theme_comment_alter_diff(&$variables) {
   $rows = array();
   foreach ($variables['changed_fields'] as $field) {
     foreach ($field as $value) {
-      $rows[] = array(
+      $row = array(
         empty($value['name']) ? '' : ($value['name'] . ':'),
-        implode(', ', $value['old']),
-        '&raquo;',
-        implode(', ', $value['new']),
       );
+      if (!empty($value['changes'])) {
+        $row[] = array(
+          'data' => $value['changes'],
+          'colspan' => 3,
+        );
+      }
+      else {
+        $row[] = implode(', ', $value['old']);
+        $row[] = '&raquo;';
+        $row[] = implode(', ', $value['new']);
+      }
+      $rows[] = $row;
     }
   }
   drupal_add_css(drupal_get_path('module', 'comment_alter') . '/comment_alter.css');
