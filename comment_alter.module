@@ -149,7 +149,20 @@ function comment_alter_requirements($phase) {
  * @see _comment_alter_submit_node_fields()
  */
 function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
-  $node = $form['#node'];
+  // Load the latest revision instead of the current if asked for.
+  if (variable_get('comment_alter_' . $form['#node']->type, 0)) {
+    $vid = db_select('node_revision', 'nr')
+      ->fields('nr', array('vid'))
+      ->condition('nid', $form['#node']->nid)
+      ->orderBy('timestamp', 'DESC')
+      ->range(0, 1)
+      ->execute()
+      ->fetchField();
+  }
+  else {
+    $vid = NULL;
+  }
+  $node = node_load($form['#node']->nid, $vid);
   $comment_alter_fields = comment_alter_get_alterable_fields($node->type);
   // Add widgets to comment form if comment form is new, and if comment alter
   // fields are available.
@@ -158,7 +171,7 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
     // enables that other modules can re-order or group the fields.
     $field_infos = field_info_extra_fields('comment', 'comment_node_' . $node->type, 'form');
     // The _comment_alter_submit_node_fields() function needs these two arrays.
-    // This one is a list of comment_alterable field.
+    // This one is a list of comment_alterable fields.
     $alterable_fields = array();
     // This one informs about comment_alterable columns per comment_alterable
     // fields. First-level key is the field name, second-level keys (and values)
@@ -641,4 +654,16 @@ function comment_alter_comment_alter_node_postsave($node, $comment) {
   if (module_exists('rules')) {
     rules_invoke_event('comment_alter_node_postsave', $node, $comment);
   }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function comment_alter_form_node_type_form_alter(&$form, &$form_state, $form_id) {
+  $form['comment']['comment_alter'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Use the latest revision as the default values for comment alterable fields (if any)'),
+    '#description' => t('If you want to load the field values from the latest revision of the node (instead of the current revision) when the comment form is displayed (eg. when the <a href="!url">Revisioning</a> module is being used), tick this.', array('!url' => 'https://drupal.org/project/revisioning')),
+    '#default_value' => variable_get('comment_alter_' . $form['#node_type']->type, 0),
+  );
 }
