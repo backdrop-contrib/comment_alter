@@ -508,6 +508,15 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
       '#langcode' => $langcode,
     );
   }
+  // Add the link if needed AND current user has access to it.
+  $path = 'node/' . $comment->nid . '/revisions/view/' . $comment->comment_alter['old_vid'] . '/' . $comment->comment_alter['new_vid'];
+  if (variable_get('comment_alter_diff_link_' . $type, 0) && drupal_valid_path($path)) {
+    $comment->content['links']['comment']['#links']['comment-alter'] = array(
+      'title' => t('diff'),
+      'href' => $path,
+      'html' => TRUE,
+    );
+  }
 }
 
 /**
@@ -660,10 +669,16 @@ function comment_alter_comment_alter_node_postsave($node, $comment) {
  * Implements hook_form_FORM_ID_alter().
  */
 function comment_alter_form_node_type_form_alter(&$form, &$form_state, $form_id) {
+  $node_type = &$form['#node_type']->type;
   $form['comment']['comment_alter'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use the latest revision as the default values for comment alterable fields (if any)'),
     '#description' => t('If you want to load the field values from the latest revision of the node (instead of the current revision) when the comment form is displayed (eg. when the <a href="!url">Revisioning</a> module is being used), tick this.', array('!url' => 'https://drupal.org/project/revisioning')),
-    '#default_value' => variable_get('comment_alter_' . $form['#node_type']->type, 0),
+    '#default_value' => variable_get('comment_alter_' . $node_type, 0),
+  );
+  $form['comment']['comment_alter_diff_link'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Add a link to the usual diff of the two revisions to the links area of the comment'),
+    '#default_value' => variable_get('comment_alter_diff_link_' . $node_type, 0),
   );
 }
