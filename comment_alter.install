@@ -48,5 +48,6 @@ function comment_alter_uninstall() {
   foreach ($node_types as $node_type) {
     variable_del('comment_alter_' . $node_type);
     variable_del('comment_alter_diff_link_' . $node_type);
+    variable_del('comment_alter_root_only_' . $node_type);
   }
 }

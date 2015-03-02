@@ -149,6 +149,11 @@ function comment_alter_requirements($phase) {
  * @see _comment_alter_submit_node_fields()
  */
 function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
+  // Check if we are on the reply-to-comment form and if it should contain
+  // comment_alterable fields at all (bail out early if needed).
+  if ($form['pid']['#value'] && variable_get('comment_alter_root_only_' . $form['#node']->type, 0)) {
+    return;
+  }
   // Load the latest revision instead of the current if asked for.
   if (variable_get('comment_alter_' . $form['#node']->type, 0)) {
     $vid = db_select('node_revision', 'nr')
@@ -682,5 +687,16 @@ function comment_alter_form_node_type_form_alter(&$form, &$form_state, $form_id)
     '#type' => 'checkbox',
     '#title' => t('Add a link to the usual diff of the two revisions to the links area of the comment'),
     '#default_value' => variable_get('comment_alter_diff_link_' . $node_type, 0),
+  );
+  $form['comment']['comment_alter_root_only'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Allow altering fields only when submitting root-level comments'),
+    '#description' => t('Ie. disallow comment altering when replying to comments.'),
+    '#default_value' => variable_get('comment_alter_root_only_' . $node_type, 0),
+    '#states' => array(
+      'visible' => array(   // action to take.
+        ':input[name=comment_default_mode]' => array('checked' => TRUE),
+      ),
+    ),
   );
 }
