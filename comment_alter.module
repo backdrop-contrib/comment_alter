@@ -577,12 +577,13 @@ function theme_comment_alter_diff(&$variables) {
     }
   }
   drupal_add_css(drupal_get_path('module', 'comment_alter') . '/comment_alter.css');
-  return theme('table', array(
+  $build = array(
     '#theme' => 'table__comment_alter__diff',
     '#rows' => $rows,
     '#attributes' => array('class' => array('comment-alter-diff')),
     '#sticky' => FALSE,
-  ));
+  );
+  return drupal_render($build);
 }
 
 /**
