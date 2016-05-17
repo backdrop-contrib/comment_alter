@@ -557,34 +557,36 @@ function comment_alter_theme() {
  * @ingroup themeable
  */
 function theme_comment_alter_diff(&$variables) {
-  $rows = array();
-  foreach ($variables['changed_fields'] as $field) {
-    foreach ($field as $value) {
-      $row = array(
-        empty($value['name']) ? '' : ($value['name'] . ':'),
-      );
-      if (!empty($value['changes'])) {
-        $row[] = array(
-          'data' => $value['changes'],
-          'colspan' => 3,
+  if ($variables['changed_fields']) {
+    $rows = array();
+    foreach ($variables['changed_fields'] as $field) {
+      foreach ($field as $value) {
+        $row = array(
+          empty($value['name']) ? '' : ($value['name'] . ':'),
         );
+        if (!empty($value['changes'])) {
+          $row[] = array(
+            'data' => $value['changes'],
+            'colspan' => 3,
+          );
+        }
+        else {
+          $row[] = implode(', ', $value['old']);
+          $row[] = '&raquo;';
+          $row[] = implode(', ', $value['new']);
+        }
+        $rows[] = $row;
       }
-      else {
-        $row[] = implode(', ', $value['old']);
-        $row[] = '&raquo;';
-        $row[] = implode(', ', $value['new']);
-      }
-      $rows[] = $row;
     }
+    drupal_add_css(drupal_get_path('module', 'comment_alter') . '/comment_alter.css');
+    $build = array(
+      '#theme' => 'table__comment_alter__diff',
+      '#rows' => $rows,
+      '#attributes' => array('class' => array('comment-alter-diff')),
+      '#sticky' => FALSE,
+    );
+    return drupal_render($build);
   }
-  drupal_add_css(drupal_get_path('module', 'comment_alter') . '/comment_alter.css');
-  $build = array(
-    '#theme' => 'table__comment_alter__diff',
-    '#rows' => $rows,
-    '#attributes' => array('class' => array('comment-alter-diff')),
-    '#sticky' => FALSE,
-  );
-  return drupal_render($build);
 }
 
 /**
