@@ -92,6 +92,27 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
   }
 
   /**
+   * Asserts that previewing a comment doesn't produces any error.
+   *
+   * @param $nid
+   *   The node ID to post the comment for.
+   * @param array $comment_edit
+   *   An array that gets added to the $edit array passed to
+   *   $this->drupalPost().
+   */
+  protected function assertCommentPreview($nid, $comment_edit) {
+    $this->drupalGet("node/$nid");
+    $edit = array();
+    $edit['comment_body[' . LANGUAGE_NONE . '][0][value]'] = $this->randomName();
+    $edit = array_merge($edit, $comment_edit);
+    $this->drupalPost(NULL, $edit, t('Preview'));
+    $this->assertNoText('Undefined index: new_vid in comment_alter_comment_view()', 'An error is thrown while previewing comments');
+    // Make sure that we are back on the respective node page to tests the
+    // comment diff without posting any comment.
+    $this->drupalGet("node/$nid");
+  }
+
+  /**
    * Create a node programmatically and post a comment using the psuedo browser.
    *
    * @param array $original_properties
@@ -112,6 +133,7 @@ class CommentAlterBaseTestCase extends DrupalWebTestCase {
       'type' => $this->content_type,
     ) + $original_properties);
     $this->postComment($node->nid, $comment_edit);
+    $this->assertCommentPreview($node->nid, $comment_edit);
     return $node;
   }
 

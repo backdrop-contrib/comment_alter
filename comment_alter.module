@@ -515,7 +515,7 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
     );
   }
   // Add the link if needed AND current user has access to it.
-  if (isset($comment->comment_alter)) {
+  if (isset($comment->comment_alter) && isset($comment->comment_alter['new_vid'])) {
     $path = 'node/' . $comment->nid . '/revisions/view/' . $comment->comment_alter['old_vid'] . '/' . $comment->comment_alter['new_vid'];
     if (variable_get('comment_alter_diff_link_' . $type, 0) && drupal_valid_path($path)) {
       $comment->content['links']['comment']['#links']['comment-alter'] = array(
