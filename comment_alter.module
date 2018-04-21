@@ -20,7 +20,7 @@ function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state,
   if ($form['#field']['type'] == 'image' || $form['#field']['type'] == 'field_collection') {
     return;
   }
-  if ($form['instance']['entity_type']['#value'] == 'node') {
+  if (isset($form['instance']) && $form['instance']['entity_type']['#value'] == 'node') {
     $bundle_name = $form['instance']['bundle']['#value'];
     $field_name = $form['instance']['field_name']['#value'];
     $comment_fields = field_info_instances('comment', 'comment_node_' . $bundle_name);
