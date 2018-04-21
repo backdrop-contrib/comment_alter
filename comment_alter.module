@@ -272,24 +272,28 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
  *   Suffix for old value cleanup.
  */
 function _comment_alter_cleanup_field_values(&$values, $field_name, $old = '') {
+  $field_value =& $values[$field_name . $old];
+  $alterable_columns = $values['comment_alter']['alterable_columns'][$field_name];
+
   // Multiple-value fields should not have an 'add_more' delta (this comes from
   // the Field API's Form API stuff: 'add_more' delta is the 'Add more' button.
-  foreach ($values[$field_name . $old] as $language => $deltas) {
-    foreach ($values[$field_name . $old][$language] as $delta => $columns) {
+  foreach ($field_value as $language => $deltas) {
+    foreach ($field_value[$language] as $delta => $columns) {
       if ($delta === 'add_more') {
-        unset($values[$field_name . $old][$language][$delta]);
+        unset($field_value[$language][$delta]);
         continue;
       }
       // Non-alterable columns (eg. _weight) should be removed (from
       // comparison).
-      foreach ($values[$field_name . $old][$language][$delta] as $column => $value) {
-        if (!isset($values['comment_alter']['alterable_columns'][$field_name][$column])) {
-          unset($values[$field_name . $old][$language][$delta][$column]);
+      foreach ($field_value[$language][$delta] as $column => $value) {
+        if (!isset($alterable_columns[$column])) {
+          unset($field_value[$language][$delta][$column]);
         }
       }
     }
   }
-  _comment_alter_cleanup_arrays($values[$field_name]);
+
+  _comment_alter_cleanup_arrays($field_value);
 }
 
 /**
