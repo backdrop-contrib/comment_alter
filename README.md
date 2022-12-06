@@ -8,7 +8,7 @@ However, unlike those modules which have the available fields hard-coded, this m
 
 By using only standard Backdrop components like Fields and Views, you can construct any variety of full-featured bug trackers, customer support, sales or project management tools.
 
-This is most similar to [Comment Driven](http://drupal.org/project/comment_driven) (for Drupal 6), except (1) it's available for Drupal 7 and (2) it's design is much simpler! Rather than inventing lots of new code and APIs, **Comment Alter** strives to integrate with other modules (like core's Node module to store the changes as new revisions and Diff module for displaying the changes made in a particular comment).
+This is most similar to [Comment Driven](http://drupal.org/project/comment_driven) for Drupal 6, except it's design is much simpler! Rather than inventing lots of new code and APIs, **Comment Alter** strives to integrate with other modules (like core's Node module to store the changes as new revisions and Diff module for displaying the changes made in a particular comment).
 
 
 ## Requirements
