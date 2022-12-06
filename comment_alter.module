@@ -485,7 +485,6 @@ function comment_alter_get_changed_fields($comment, $langcode) {
             continue;
           }
           $rows = diff_get_rows($old, $new);
-          sdpm($rows);
           $line = 0;
           foreach ($rows as $row) {
             $changed_fields[$field_name][] = array(
@@ -499,7 +498,6 @@ function comment_alter_get_changed_fields($comment, $langcode) {
       }
     }
   }
-  #sdpm($changed_fields);
   return $changed_fields;
 }
 
