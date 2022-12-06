@@ -22,7 +22,7 @@ function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state,
 
    $form['instance']['settings']['comment_alter'] = array(
      '#type' => 'checkbox',
-     '#title' => t('Enable altering this field from comments.'),
+     '#title' => t('Enable altering this field from comments'),
      '#weight' => $form['instance']['required']['#weight'] + 0.5,
      '#default_value' => !empty($form['#instance']['settings']['comment_alter']),
    );
@@ -685,6 +685,12 @@ function comment_alter_comment_alter_node_postsave($node, $comment) {
 function comment_alter_form_node_type_form_alter(&$form, &$form_state, $form_id) {
   $config = config('comment_alter.settings');
   $node_type = &$form['#node_type']->type;
+  $form['comment']['comment_alter_title'] = array(
+    '#type' => 'markup',
+    '#prefix' => '<label>',
+    '#suffix' => '</label>',
+    '#markup' => 'Comment alter settings',
+  );
   $form['comment']['comment_alter'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use the latest revision as the default values for comment alterable fields (if any)'),
