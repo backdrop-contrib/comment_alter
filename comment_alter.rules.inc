@@ -9,8 +9,14 @@
  */
 function comment_alter_rules_event_info() {
   $comment_alter_node_postsave_variables = array(
-    'node' => array('type' => 'node', 'label' => t('comment altered content')),
-    'comment' => array('type' => 'comment', 'label' => t('comment')),
+    'node' => array(
+      'type' => 'node',
+      'label' => t('comment altered content'),
+    ),
+    'comment' => array(
+      'type' => 'comment',
+      'label' => t('comment'),
+    ),
     'node_unchanged' => array(
       'type' => 'node',
       'label' => t('unchanged content'),

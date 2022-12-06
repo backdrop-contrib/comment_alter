@@ -18,7 +18,7 @@
  *   The comment that was submitted with this change.
  */
 function hook_comment_alter_node_postsave($node, $comment) {
-  drupal_set_message(t('%user has updated !node by submitting a comment.', array('%user' => $comment->name, '!node' => l($node->title, 'node/' . $node->nid))));
+  backdrop_set_message(t('%user has updated !node by submitting a comment.', array('%user' => $comment->name, '!node' => l($node->title, 'node/' . $node->nid))));
 }
 
 /**

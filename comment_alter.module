@@ -3,9 +3,6 @@
 /**
  * @file
  * Provides UI to alter nodes' parameters from comment forms.
- *
- * @author
- * CSÉCSY László <boobaa@kybest.hu>
  */
 
 /**
@@ -13,44 +10,32 @@
  *
  * @see comment_alter_form_field_ui_field_edit_form_alter_submit()
  */
+
 function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
-  // Image fields fields are not supported by now, peroid.
-  // Field collection not currently supported by Diff module.
-  // @see http://drupal.org/node/1897196
-  if ($form['#field']['type'] == 'image' || $form['#field']['type'] == 'field_collection') {
-    return;
-  }
-  if (isset($form['instance']) && $form['instance']['entity_type']['#value'] == 'node') {
-    $bundle_name = $form['instance']['bundle']['#value'];
-    $field_name = $form['instance']['field_name']['#value'];
-    $comment_fields = field_info_instances('comment', 'comment_node_' . $bundle_name);
+ if ($form['#field']['type'] == 'image' || $form['#field']['type'] == 'field_collection') {
+   return;
+ }
+ if (isset($form['instance']) && $form['instance']['entity_type']['#value'] == 'node') {
+   $bundle_name = $form['instance']['bundle']['#value'];
+   $field_name = $form['instance']['field_name']['#value'];
+   $comment_fields = field_info_instances('comment', 'comment_node_' . $bundle_name);
 
-    // Additional custom field values will be automatically stored in the
-    // database, so custom save mechanism is not necessary.
-    $form['instance']['comment_alter'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Enable altering this field from comments.'),
-      '#weight' => $form['instance']['required']['#weight'] + 0.5,
-      '#default_value' => !empty($form['#instance']['comment_alter']),
-    );
-    $form['instance']['comment_alter_hide'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Hide alterations of this field from diffs.'),
-      '#weight' => $form['instance']['required']['#weight'] + 0.7,
-      '#default_value' => !empty($form['#instance']['comment_alter_hide']),
-      '#states' => array(
-        'invisible' => array(':input[name="instance[comment_alter]"]' => array('checked' => FALSE)),
-      ),
-    );
+   $form['instance']['settings']['comment_alter'] = array(
+     '#type' => 'checkbox',
+     '#title' => t('Enable altering this field from comments.'),
+     '#weight' => $form['instance']['required']['#weight'] + 0.5,
+     '#default_value' => !empty($form['#instance']['settings']['comment_alter']),
+   );
 
-    // Make sure the field isn't already on the Comment entity.
-    if (!empty($comment_fields[$field_name])) {
-      $form['instance']['comment_alter']['#default_value'] = FALSE;
-      $form['instance']['comment_alter']['#disabled'] = TRUE;
-      $form['instance']['comment_alter']['#description'] = '<span class="error">' . t('This field also exists on the comment. You must remove it from the comment in order to enable altering this field from comments.') . '</span>';
-    }
-  }
+   // Make sure the field isn't already on the Comment entity.
+   if (!empty($comment_fields[$field_name])) {
+     $form['instance']['settings']['comment_alter']['#default_value'] = FALSE;
+     $form['instance']['settings']['comment_alter']['#disabled'] = TRUE;
+     $form['instance']['settings']['comment_alter']['#description'] = '<span class="error">' . t('This field also exists on the comment. You must remove it from the comment in order to enable altering this field from comments.') . '</span>';
+   }
+ }
 }
+
 
 /**
  * Returns the comment-alterable fields for a content type.
@@ -61,13 +46,12 @@ function comment_alter_form_field_ui_field_edit_form_alter(&$form, &$form_state,
  *   Array of the comment-alterable fields for that content type.
  */
 function comment_alter_get_alterable_fields($content_type) {
-  $comment_alter_fields = &drupal_static(__FUNCTION__);
+  $comment_alter_fields = &backdrop_static(__FUNCTION__);
   if (!isset($comment_alter_fields[$content_type])) {
     $field_infos = field_info_instances('node', $content_type);
-    $comment_fields = field_info_instances('comment', 'comment_node_' . $content_type);
     $comment_alter_fields[$content_type] = array();
     foreach ($field_infos as $field_name => $value) {
-      if (!empty($value['comment_alter']) && empty($comment_fields[$field_name])) {
+      if (!empty($value['settings']['comment_alter'])) {
         $comment_alter_fields[$content_type][] = $field_name;
       }
     }
@@ -87,9 +71,8 @@ function comment_alter_form_field_ui_field_overview_form_alter(&$form, &$form_st
     // node bundle name.
     $node_bundle_name = substr($form['#bundle'], 13);
     $comment_alter_fields = comment_alter_get_alterable_fields($node_bundle_name);
-
     if (!empty($comment_alter_fields)) {
-      $field_options =& $form['fields']['_add_existing_field']['field_name']['#options'];
+      $field_options = &$form['fields']['_add_existing_field']['field_name']['#options'];
       foreach ($field_options as $field_name => $field_label) {
         if (in_array($field_name, $comment_alter_fields)) {
           // Remove fields that are alterable from comment on the parent node.
@@ -120,7 +103,7 @@ function comment_alter_requirements($phase) {
       $field_infos = field_info_instances('node', $bundle_name);
       $comment_alter_fields = array();
       foreach ($field_infos as $field_name => $value) {
-        if (!empty($value['comment_alter'])) {
+        if (!empty($value['settings']['comment_alter'])) {
           $comment_alter_fields[] = $field_name;
         }
       }
@@ -144,18 +127,30 @@ function comment_alter_requirements($phase) {
 }
 
 /**
+ * Implements hook_config_info().
+ */
+function comment_alter_config_info() {
+  $prefixes['comment_alter.settings'] = array(
+    'label' => t('Comment alter settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
+
+/**
  * Implements hook_form_BASE_FORM_ID_alter().
  *
  * @see _comment_alter_submit_node_fields()
  */
 function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
+  $config = config('comment_alter.settings');
   // Check if we are on the reply-to-comment form and if it should contain
   // comment_alterable fields at all (bail out early if needed).
-  if ($form['pid']['#value'] && variable_get('comment_alter_root_only_' . $form['#node']->type, 0)) {
+  if ($form['pid']['#value'] && $config->get('comment_alter_root_only_' . $form['#node']->type)) {
     return;
   }
   // Load the latest revision instead of the current if asked for.
-  if (variable_get('comment_alter_' . $form['#node']->type, 0)) {
+  if ($config->get('comment_alter_' . $form['#node']->type)) {
     $vid = db_select('node_revision', 'nr')
       ->fields('nr', array('vid'))
       ->condition('nid', $form['#node']->nid)
@@ -188,7 +183,7 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
       // no other side-effects (for example, the field_groups from the node
       // entity).
       $node_form = $form;
-      field_attach_form('node', $node, $node_form, $form_state, $node->language, array('field_name' => $field_name));
+      field_attach_form('node', $node, $node_form, $form_state, [LANGUAGE_NONE], array('field_name' => $field_name));
       if (!empty($node_form[$field_name])) {
         $form[$field_name] = $node_form[$field_name];
         $field_language = $form[$field_name]['#language'];
@@ -205,9 +200,6 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
           '#type' => 'value',
           '#value' => $field_value,
         );
-        // TODO: This doesn't seem to be working properly: if the extra field is
-        // set to last, it even gets displayed above comment subject.
-        $form[$field_name]['#weight'] = $field_infos[$field_name]['weight'];
 
         // Remember that this field is alterable.
         $alterable_fields[$field_name] = $field_name;
@@ -272,7 +264,7 @@ function comment_alter_form_comment_form_alter(&$form, &$form_state, $form_id) {
  *   Suffix for old value cleanup.
  */
 function _comment_alter_cleanup_field_values(&$values, $field_name, $old = '') {
-  $field_value =& $values[$field_name . $old];
+  $field_value = &$values[$field_name . $old];
   $alterable_columns = $values['comment_alter']['alterable_columns'][$field_name];
 
   // Multiple-value fields should not have an 'add_more' delta (this comes from
@@ -402,7 +394,7 @@ function _comment_alter_submit_node_fields($form, &$form_state) {
         'new_vid' => $node->vid,
         'cid' => $values['cid'],
       );
-      drupal_write_record('comment_alter', $comment_alter);
+      backdrop_write_record('comment_alter', $comment_alter);
     }
   }
 }
@@ -467,7 +459,7 @@ function comment_alter_get_changed_fields($comment, $langcode) {
       $field = field_info_field($field_name);
       if (field_access('view', $field, 'node') && in_array($field_name, $comment_alter_fields)) {
         $instance = field_info_instance('node', $field_name, $node->type);
-        list ($old, $new) = diff_extract_state($diff, $context['states'][0]);
+        list($old, $new) = diff_extract_state($diff, $context['states'][0]);
         if ($old != $new) {
           if (!empty($instance['comment_alter_hide'])) {
             if (diff_node_revision_access($node)) {
@@ -486,6 +478,7 @@ function comment_alter_get_changed_fields($comment, $langcode) {
             continue;
           }
           $rows = diff_get_rows($old, $new);
+          #sdpm($rows);
           $line = 0;
           foreach ($rows as $row) {
             $changed_fields[$field_name][] = array(
@@ -499,6 +492,7 @@ function comment_alter_get_changed_fields($comment, $langcode) {
       }
     }
   }
+  #sdpm($changed_fields);
   return $changed_fields;
 }
 
@@ -521,7 +515,7 @@ function comment_alter_comment_view($comment, $view_mode, $langcode) {
   // Add the link if needed AND current user has access to it.
   if (isset($comment->comment_alter) && isset($comment->comment_alter['new_vid'])) {
     $path = 'node/' . $comment->nid . '/revisions/view/' . $comment->comment_alter['old_vid'] . '/' . $comment->comment_alter['new_vid'];
-    if (variable_get('comment_alter_diff_link_' . $type, 0) && drupal_valid_path($path)) {
+    if (config_get('comment_alter.settings', 'comment_alter_diff_link_' . $type) && backdrop_valid_path($path)) {
       $comment->content['links']['comment']['#links']['comment-alter'] = array(
         'title' => t('diff'),
         'href' => $path,
@@ -582,14 +576,14 @@ function theme_comment_alter_diff(&$variables) {
         $rows[] = $row;
       }
     }
-    drupal_add_css(drupal_get_path('module', 'comment_alter') . '/comment_alter.css');
+    backdrop_add_css(backdrop_get_path('module', 'comment_alter') . '/comment_alter.css');
     $build = array(
       '#theme' => 'table__comment_alter__diff',
       '#rows' => $rows,
       '#attributes' => array('class' => array('comment-alter-diff')),
       '#sticky' => FALSE,
     );
-    return drupal_render($build);
+    return backdrop_render($build);
   }
 }
 
@@ -684,29 +678,44 @@ function comment_alter_comment_alter_node_postsave($node, $comment) {
  * Implements hook_form_FORM_ID_alter().
  */
 function comment_alter_form_node_type_form_alter(&$form, &$form_state, $form_id) {
+  $config = config('comment_alter.settings');
   $node_type = &$form['#node_type']->type;
   $form['comment']['comment_alter'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use the latest revision as the default values for comment alterable fields (if any)'),
-    '#description' => t('If you want to load the field values from the latest revision of the node (instead of the current revision) when the comment form is displayed (eg. when the <a href="!url">Revisioning</a> module is being used), tick this.', array('!url' => 'https://drupal.org/project/revisioning')),
-    '#default_value' => variable_get('comment_alter_' . $node_type, 0),
+    '#description' => t('If you want to load the field values from the latest revision of the node (instead of the current revision) when the comment form is displayed, tick this.'),
+    '#default_value' => $config->get('comment_alter_' . $node_type),
   );
   $form['comment']['comment_alter_diff_link'] = array(
     '#type' => 'checkbox',
     '#title' => t('Add a link to the usual diff of the two revisions to the links area of the comment'),
-    '#default_value' => variable_get('comment_alter_diff_link_' . $node_type, 0),
+    '#default_value' => $config->get('comment_alter_diff_link_' . $node_type),
   );
   $form['comment']['comment_alter_root_only'] = array(
     '#type' => 'checkbox',
     '#title' => t('Allow altering fields only when submitting root-level comments'),
     '#description' => t('Ie. disallow comment altering when replying to comments.'),
-    '#default_value' => variable_get('comment_alter_root_only_' . $node_type, 0),
+    '#default_value' => $config->get('comment_alter_root_only_' . $node_type),
     '#states' => array(
-      'visible' => array(   // action to take.
+      'visible' => array(// action to take.
         ':input[name=comment_default_mode]' => array('checked' => TRUE),
       ),
     ),
   );
+  $form['#submit'][] = '_comment_alter_form_node_type_form_alter_submit';
+}
+
+function _comment_alter_form_node_type_form_alter_submit(&$form, &$form_state) {
+  $config = config('comment_alter.settings');
+  $node_type = &$form['#node_type']->type;
+  foreach ($form_state['groups']['additional_settings'] as $id => $additional_setting) {
+    if (is_numeric($id) && isset($additional_setting['comment_alter'])) {
+      $config->set('comment_alter_' . $node_type, $form_state['groups']['additional_settings'][$id]['comment_alter']['#value']);
+      $config->set('comment_alter_diff_link_' . $node_type, $form_state['groups']['additional_settings'][$id]['comment_alter_diff_link']['#value']);
+      $config->set('comment_alter_root_only_' . $node_type, $form_state['groups']['additional_settings'][$id]['comment_alter_root_only']['#value']);
+      $config->save();
+    }
+  }
 }
 
 /**
@@ -720,3 +729,16 @@ function comment_alter_node_revision_delete($node) {
     )
     ->execute();
 }
+
+/**
+ * Implements hook_autoload_info().
+ */
+function comment_alter_autoload_info() {
+  return array(
+    'RulesCommentAlterNodeEventHandler' => 'comment_alter.rules.inc',
+  );
+}
+
+
+
+

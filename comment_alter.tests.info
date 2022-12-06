@@ -1,0 +1,42 @@
+[CommentAlterBaseTestCase]
+name = CommentAlterBaseTestCase
+description = CommentAlterBaseTestCase
+group = comment_alter
+file = comment_alter.test
+
+[CommentAlterAdminTestCase]
+name = Comment Alter - Admin UI
+description = Functional tests for the admin UIs provided by Comment Alter.
+group = Comment Alter
+file = comment_alter.test
+
+[CommentAlterListTextTestCase]
+name = Comment Alter - List (text)
+description = Ensure that Comment Alter is working with "List (text)" fields
+group = Comment Alter
+file = comment_alter.test
+
+[CommentAlterTextTestCase]
+name = Comment Alter - Text
+description = Ensure that Comment Alter is working with "Text" fields
+group = Comment Alter
+file = comment_alter.test
+
+[CommentAlterFileTestCase]
+name = Comment Alter - File
+description = Ensure that Comment Alter is working with "File" fields
+group = Comment Alter
+file = comment_alter.test
+
+[CommentAlterPermissionTestCase]
+name = Comment Alter - Permissions
+description = Ensure that Comment Alter is correctly following user permissions.
+group = Comment Alter
+file = comment_alter.test
+
+[CommentAlterDeletedRevisionTestCase]
+name = Comment Alter - Deleted revision
+description = Ensure that Comment Alter is working with deleted revision
+group = Comment Alter
+file = comment_alter.test
+
