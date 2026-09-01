@@ -455,13 +455,6 @@ function comment_alter_get_changed_fields($comment, $langcode) {
     }
     $diffs = diff_compare_entities($old_node, $new_node, $context);
     foreach ($diffs as $field_name => $diff) {
-      // Until https://github.com/backdrop-contrib/diff/issues/27 is resolved,
-      // get rid of <span class="date-display-single"> added by Backdrop core as
-      // otherwise the output of the date field is botched by DiffEngine.
-      if ($field_name == 'field_date') {
-        $diff['#states']['raw']['#old'][0] = substr($diff['#states']['raw']['#old'][0], 34, -7);
-        $diff['#states']['raw']['#new'][0] = substr($diff['#states']['raw']['#new'][0], 34, -7);
-      }
       // Only compare fields that belong to us.
       $field = field_info_field($field_name);
       if (field_access('view', $field, 'node') && in_array($field_name, $comment_alter_fields)) {
@@ -489,9 +482,8 @@ function comment_alter_get_changed_fields($comment, $langcode) {
           foreach ($rows as $row) {
             $changed_fields[$field_name][] = array(
               'name' => $line ? '' : $diff['#name'],
-              'old' => array(empty($row[1]['data']) ? '' : $row[1]['data']),
-              'new' => array(empty($row[3]['data']) ? '' : $row[3]['data']),
-            );
+              'old' => array(html_entity_decode($row[1]['data'] ?? '')),
+              'new' => array(html_entity_decode($row[3]['data'] ?? '')),            );
             $line++;
           }
         }
